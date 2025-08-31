@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: ttip-frontend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=4096"
+      - key: NODE_ENV
+        value: production

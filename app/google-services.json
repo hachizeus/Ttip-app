@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "4240271040",
+    "project_id": "ttip-89517",
+    "storage_bucket": "ttip-89517.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:4240271040:android:f4af683a14ac1ebd246f25",
+        "android_client_info": {
+          "package_name": "com.elitjohns.ttip"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBBiARhhZzR4PEgp2RDe0KHMwAIlQwd0IM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
