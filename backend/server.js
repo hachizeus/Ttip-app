@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { initiateMpesaPayment, initiateB2CPayment } from './enhanced-daraja.mjs';
 import { sendTipNotification, sendOTPSMS } from './sms.mjs';
 
-configDotenv('./.env');
+configDotenv({ path: './.env' });
 
 const app = express();
 app.use(json({ limit: '10mb' }));
