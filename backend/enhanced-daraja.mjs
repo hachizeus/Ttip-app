@@ -53,7 +53,7 @@ export const initiateMpesaPayment = async (phoneNumber, amount, accountReference
         PhoneNumber: phoneNumber,
         CallBackURL: 'https://ttip-app.onrender.com/api/callback',
         AccountReference: accountReference,
-        TransactionDesc: `Tip payment for worker ${accountReference}`,
+        TransactionDesc: `Pay KSh ${amount} through TTip to worker`,
     };
     
     console.log('STK Push payload:', JSON.stringify(payload, null, 2));
