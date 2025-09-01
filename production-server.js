@@ -304,11 +304,11 @@ app.get('/tip/:workerID', async (req, res) => {
         </head>
         <body>
             <div class="container">
-                <h1>💰 Quick Tip</h1>
-                <p>Tip for: ${workerName} (${workerOccupation})</p>
+                <h1>⚡ Quick Tip</h1>
+                <p>Tip for: ${workerOccupation}</p>
                 <input type="number" id="amount" placeholder="Enter tip amount (KSh)" />
                 <input type="tel" id="phone" placeholder="Your phone number (0712345678)" />
-                <button onclick="sendSTK()" id="payBtn">Send STK Push 📱</button>
+                <button onclick="sendSTK()" id="payBtn">Send Tip</button>
                 <div id="message"></div>
                 <div id="loading" style="display:none; text-align:center; margin-top:20px;">
                     <p>⏳ Processing payment...</p>
@@ -329,7 +329,7 @@ app.get('/tip/:workerID', async (req, res) => {
                     }
                     
                     btn.disabled = true;
-                    btn.textContent = 'Sending STK Push...';
+                    btn.textContent = 'Sending...';
                     
                     try {
                         const response = await fetch('/api/web-tip', {
@@ -368,7 +368,7 @@ app.get('/tip/:workerID', async (req, res) => {
                                         document.getElementById('loading').style.display = 'none';
                                         msg.innerHTML = '<p style="color:red">❌ Payment failed. Please try again.</p>';
                                         btn.disabled = false;
-                                        btn.textContent = 'Send STK Push 📱';
+                                        btn.textContent = 'Send Tip';
                                     }
                                 } catch (error) {
                                     console.log('Status check error:', error);
@@ -382,7 +382,7 @@ app.get('/tip/:workerID', async (req, res) => {
                                 if (msg.innerHTML.indexOf('successful') === -1 && msg.innerHTML.indexOf('failed') === -1) {
                                     msg.innerHTML = '<p style="color:orange">⏱️ Payment processing taking longer than expected. Please wait or contact support if money was deducted.</p>';
                                     btn.disabled = false;
-                                    btn.textContent = 'Send STK Push 📱';
+                                    btn.textContent = 'Send Tip';
                                 }
                             }, 180000);
                         } else {
@@ -392,7 +392,7 @@ app.get('/tip/:workerID', async (req, res) => {
                         msg.innerHTML = '<p style="color:red">Network error. Please try again.</p>';
                     } finally {
                         btn.disabled = false;
-                        btn.textContent = 'Send STK Push 📱';
+                        btn.textContent = 'Send Tip';
                     }
                 }
             </script>

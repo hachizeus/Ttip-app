@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const INFOBIP_API_KEY = '31452a76fa854f2a28ea57e832ff03ea-904c3ac4-b9f0-4553-9a62-6c1e8cecf2a0'
-const INFOBIP_BASE_URL = 'https://api.infobip.com'
+const INFOBIP_BASE_URL = 'https://5139rg.api.infobip.com'
 
 const tipMessages = [
     "🎉 You've received KSh {amount} via Ttip. Great service today 👏",

@@ -1,58 +1,49 @@
 {
   "expo": {
     "name": "TTip",
-    "slug": "ttip",
+    "slug": "ttip-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/mylogo.png",
-    "scheme": "myapp",
+    "icon": "./assets/images/icon.png",
+    "scheme": "ttip",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "./assets/images/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.elitjohns.ttip",
-      "googleServicesFile": "./app/GoogleService-Info.plist"
+      "bundleIdentifier": "com.ttip.app"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/mylogo.png",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.elitjohns.ttip",
-      "googleServicesFile": "./app/google-services.json"
+      "package": "com.ttip.app",
+      "widgets": [
+        {
+          "name": "QRWidget",
+          "description": "Show your TTip QR code",
+          "minWidth": 2,
+          "minHeight": 2,
+          "maxWidth": 4,
+          "maxHeight": 4,
+          "previewImage": "./assets/images/widget-preview.png"
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/mylogo.png",
-      "build": {
-        "babel": {
-          "include": [
-            "@expo/vector-icons"
-          ]
-        }
-      }
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router"
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "packagerOpts": {
-      "host": "192.168.1.3"
-    },
-    "extra": {
-      "router": {
-        "origin": false
-      },
-      "eas": {
-        "projectId": "ttip-89517"
-      }
     }
   }
 }

@@ -172,16 +172,24 @@ export default function HomeScreen() {
           <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Show to customers</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => router.push('/analytics')}>
+        <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => router.push('/widget-setup')}>
           <View style={[styles.actionIcon, { backgroundColor: colors.primary }]}>
+            <MaterialIcons name="widgets" size={28} color="#fff" />
+          </View>
+          <Text style={[styles.actionTitle, { color: colors.text }]}>QR Widget</Text>
+          <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Add to home screen</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.quickActions}>
+        <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => router.push('/analytics')}>
+          <View style={[styles.actionIcon, { backgroundColor: colors.accent }]}>
             <MaterialIcons name="analytics" size={28} color="#fff" />
           </View>
           <Text style={[styles.actionTitle, { color: colors.text }]}>Analytics</Text>
           <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>View earnings</Text>
         </TouchableOpacity>
-      </View>
 
-      <View style={styles.quickActions}>
         <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => router.push('/scanner')}>
           <View style={[styles.actionIcon, { backgroundColor: colors.accent }]}>
             <MaterialIcons name="qr-code-scanner" size={28} color="#fff" />
@@ -189,13 +197,23 @@ export default function HomeScreen() {
           <Text style={[styles.actionTitle, { color: colors.text }]}>Scan QR</Text>
           <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Scan to tip</Text>
         </TouchableOpacity>
+      </View>
 
+      <View style={styles.quickActions}>
         <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => router.push('/subscription')}>
           <View style={[styles.actionIcon, { backgroundColor: colors.accent }]}>
             <MaterialIcons name="diamond" size={28} color="#fff" />
           </View>
           <Text style={[styles.actionTitle, { color: colors.text }]}>Subscription</Text>
           <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Upgrade plan</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]}>
+          <View style={[styles.actionIcon, { backgroundColor: '#666' }]}>
+            <MaterialIcons name="more-horiz" size={28} color="#fff" />
+          </View>
+          <Text style={[styles.actionTitle, { color: colors.text }]}>More</Text>
+          <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Coming soon</Text>
         </TouchableOpacity>
       </View>
 

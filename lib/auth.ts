@@ -12,13 +12,17 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:300
 
 export const sendOTP = async (phone: string) => {
   try {
+    console.log('Sending OTP to:', phone, 'Backend URL:', BACKEND_URL)
     const response = await fetch(`${BACKEND_URL}/api/send-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone })
     })
-    return await response.json()
+    const result = await response.json()
+    console.log('OTP response:', result)
+    return result
   } catch (error) {
+    console.error('OTP send error:', error)
     throw new Error('Failed to send OTP')
   }
 }

@@ -35,9 +35,9 @@ function SignInContent() {
   }, [])
 
   useEffect(() => {
-    // Auto-trigger fingerprint authentication when page loads if biometric is available
+    // Auto-trigger fingerprint authentication when page loads
     if (biometricAvailable && step === 'phone') {
-      setTimeout(() => handleBiometricLogin(), 500)
+      handleBiometricLogin()
     }
   }, [biometricAvailable, step])
 
@@ -64,17 +64,13 @@ function SignInContent() {
   const handleBiometricLogin = async () => {
     setBiometricLoading(true)
     try {
-      await new Promise(resolve => setTimeout(resolve, 100))
       const result = await loginWithBiometric()
       if (result.success) {
-        setShowBiometricModal(false)
         router.dismissAll()
         router.replace('/(tabs)')
-      } else {
-        setShowBiometricModal(false)
       }
     } catch (error) {
-      setShowBiometricModal(false)
+      console.log('Biometric login failed:', error)
     } finally {
       setBiometricLoading(false)
     }
@@ -103,9 +99,12 @@ function SignInContent() {
       }
       
       setUserName(data.name)
+      
       await sendOTP(apiPhone)
+      
       setStep('otp')
     } catch (error) {
+      console.error('Send OTP error:', error)
       Alert.alert('Error', 'Failed to send OTP. Please try again.')
     } finally {
       setLoading(false)
@@ -189,7 +188,7 @@ function SignInContent() {
             {renderKeypadButton(9, () => phone.length < 10 && setPhone(phone + '9'))}
           </View>
           <View style={[styles.keypadRow, phone.length === 10 && styles.keypadRowSmall]}>
-            {biometricAvailable && renderKeypadButton('', () => handleBiometricLogin(), 'fingerprint')}
+            {biometricAvailable ? renderKeypadButton('', () => handleBiometricLogin(), 'fingerprint') : <View style={styles.keypadButton} />}
             {renderKeypadButton(0, () => phone.length < 10 && setPhone(phone + '0'))}
             {renderKeypadButton('', () => setPhone(phone.slice(0, -1)), 'backspace')}
           </View>
