@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios from 'axios';
 
 // Environment variables are automatically available on Render
 const baseURL = process.env.BASE_URL || 'https://sandbox.safaricom.co.ke';
@@ -51,7 +51,7 @@ export const initiateMpesaPayment = async (phoneNumber, amount, accountReference
         PartyA: phoneNumber,
         PartyB: shortcode,
         PhoneNumber: phoneNumber,
-        CallBackURL: 'https://ttip-backend.onrender.com/api/callback',
+        CallBackURL: 'https://ttip-app.onrender.com/api/callback',
         AccountReference: accountReference,
         TransactionDesc: `Tip payment for worker ${accountReference}`,
     };
@@ -99,8 +99,8 @@ export const initiateB2CPayment = async (phoneNumber, amount, remarks = 'Tip pay
         PartyA: shortcode,
         PartyB: phoneNumber,
         Remarks: remarks,
-        QueueTimeOutURL: 'https://ttip-backend.onrender.com/api/b2c-timeout',
-        ResultURL: 'https://ttip-backend.onrender.com/api/b2c-callback',
+        QueueTimeOutURL: 'https://ttip-app.onrender.com/b2c-timeout',
+        ResultURL: 'https://ttip-app.onrender.com/b2c-callback',
         Occasion: 'Tip payout'
     };
     

@@ -81,7 +81,8 @@ function SubscriptionContent() {
     
     const poll = async () => {
       try {
-        const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-app.onrender.com'}/api/subscription-status/${checkoutID}`)
+        const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-app.onrender.com'
+        const response = await fetch(`${backendUrl}/api/subscription-status/${checkoutID}`)
         
         const result = await response.json()
         
@@ -133,7 +134,10 @@ function SubscriptionContent() {
     
     setPaymentLoading(true)
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-app.onrender.com'}/api/subscription-payment`, {
+      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-app.onrender.com'
+      console.log('Making payment request to:', `${backendUrl}/api/subscription-payment`)
+      
+      const response = await fetch(`${backendUrl}/api/subscription-payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -143,13 +147,28 @@ function SubscriptionContent() {
         })
       })
       
+      console.log('Response status:', response.status)
+      
+      if (!response.ok) {
+        if (response.status === 502) {
+          Alert.alert('Service Unavailable', 'Payment service is temporarily unavailable. Please try again later.')
+        } else if (response.status === 404) {
+          Alert.alert('Service Error', 'Payment endpoint not found. Please contact support.')
+        } else {
+          Alert.alert('Error', `Server error: ${response.status}. Please try again.`)
+        }
+        return
+      }
+      
       const text = await response.text()
+      console.log('Response text:', text)
+      
       let result
       try {
         result = JSON.parse(text)
       } catch (parseError) {
         console.error('JSON parse error:', parseError, 'Response text:', text)
-        Alert.alert('Error', 'Invalid response from server')
+        Alert.alert('Error', 'Payment service unavailable. Please try again later.')
         return
       }
       
@@ -236,7 +255,7 @@ function SubscriptionContent() {
       </ScrollView>
 
       <Modal visible={showPaymentModal} transparent animationType="fade">
-        <ModalOverlay visible={showPaymentModal}>
+        <View style={styles.modalBackdrop}>
           <View style={styles.paymentModalContainer}>
             <View style={[styles.paymentModalContent, { backgroundColor: colors.background }]}>
               <View style={[styles.paymentModalHeader, { borderBottomColor: colors.border }]}>
@@ -277,7 +296,7 @@ function SubscriptionContent() {
               </View>
             </View>
           </View>
-        </ModalOverlay>
+        </View>
       </Modal>
 
       <Modal visible={showPaymentStatus} transparent animationType="fade">
@@ -307,8 +326,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  fixedSection: {
+  header: {
     paddingTop: 60,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  headerSpacer: {
+    width: 32,
+  },
+  fixedSection: {
     paddingHorizontal: 12,
     paddingBottom: 12,
     zIndex: 1000,
@@ -319,7 +357,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 12,
     paddingTop: 12,
-    paddingBottom: 100,
+    paddingBottom: 20,
   },
   currentPlan: {
     padding: 20,
@@ -420,17 +458,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  paymentModalContainer: {
+  modalBackdrop: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+  },
+  paymentModalContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   paymentModalContent: {
-    width: '100%',
-    maxWidth: 320,
+    width: 320,
     borderRadius: 16,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1001,
   },
   paymentModalHeader: {
     flexDirection: 'row',
