@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { MaterialIcons } from '@expo/vector-icons'
 import { useTheme, ThemeProvider } from '../lib/theme-context'
 import * as ImagePicker from 'expo-image-picker'
+import { fonts, fontWeights } from '../lib/fonts'
 
 function SettingsContent() {
   const { colors } = useTheme()
@@ -252,14 +253,16 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
   },
   saveButton: {
     padding: 4,
   },
   saveText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.semibold,
   },
   scrollContainer: {
     flexGrow: 1,
@@ -275,7 +278,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
     marginBottom: 16,
   },
   imageContainer: {
@@ -311,20 +315,25 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.medium,
     marginBottom: 8,
-    fontWeight: '500',
   },
   input: {
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
   },
   textArea: {
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
     height: 100,
     textAlignVertical: 'top',
   },

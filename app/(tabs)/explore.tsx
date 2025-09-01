@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { router } from 'expo-router'
+import { fonts, fontWeights } from '../../lib/fonts'
 
 export default function ExploreScreen() {
   const [permission, requestPermission] = useCameraPermissions()
@@ -91,6 +92,8 @@ const styles = StyleSheet.create({
   instructions: {
     color: '#fff',
     fontSize: 16,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
     textAlign: 'center',
     marginTop: 20,
     paddingHorizontal: 20,
@@ -98,11 +101,14 @@ const styles = StyleSheet.create({
   scannedText: {
     color: '#00C851',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
     marginTop: 10,
   },
   noPermissionText: {
     fontSize: 16,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
     color: '#fff',
     textAlign: 'center',
     marginBottom: 20,
@@ -115,6 +121,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
   },
 })

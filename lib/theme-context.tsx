@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import { Appearance } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 interface ThemeContextType {
@@ -32,16 +33,36 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     loadTheme()
+    
+    // Listen to system theme changes
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      const isDarkMode = colorScheme === 'dark'
+      setIsDark(isDarkMode)
+      AsyncStorage.setItem('theme', isDarkMode ? 'dark' : 'light')
+    })
+
+    return () => subscription?.remove()
   }, [])
 
   const loadTheme = async () => {
     try {
-      const savedTheme = await AsyncStorage.getItem('theme')
-      if (savedTheme) {
-        setIsDark(savedTheme === 'dark')
+      const hasLaunchedBefore = await AsyncStorage.getItem('hasLaunchedBefore')
+      
+      if (!hasLaunchedBefore) {
+        // First launch - always start with light theme
+        setIsDark(false)
+        await AsyncStorage.setItem('theme', 'light')
+        await AsyncStorage.setItem('hasLaunchedBefore', 'true')
+      } else {
+        // Follow system theme for subsequent launches
+        const systemTheme = Appearance.getColorScheme()
+        const isDarkMode = systemTheme === 'dark'
+        setIsDark(isDarkMode)
+        await AsyncStorage.setItem('theme', isDarkMode ? 'dark' : 'light')
       }
     } catch (error) {
       console.error('Error loading theme:', error)
+      setIsDark(false)
     }
   }
 

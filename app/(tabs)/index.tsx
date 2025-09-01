@@ -12,6 +12,7 @@ import { checkMilestones } from '../../lib/notifications'
 import { formatPhoneForDisplay } from '../../lib/phone-utils'
 import { supabase } from '../../lib/supabase'
 import { useTheme } from '../../lib/theme-context'
+import { fonts, fontWeights } from '../../lib/fonts'
 
 export default function HomeScreen() {
   const { colors } = useTheme()
@@ -343,14 +344,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   greeting: {
-    fontSize: 14,
-    color: '#fff',
+    fontSize: 13,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
     opacity: 0.8,
+    letterSpacing: 0.1,
   },
   userName: {
     fontSize: 16,
-    color: '#fff',
-    fontWeight: '500',
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.semibold,
+    letterSpacing: 0.2,
   },
   balanceCard: {
     margin: 16,
@@ -370,7 +374,9 @@ const styles = StyleSheet.create({
   },
   brandText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.medium,
+    letterSpacing: 0.3,
     marginLeft: 8,
   },
   userOccupation: {
@@ -378,8 +384,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   balanceAmount: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 36,
+    fontFamily: fonts.light,
+    fontWeight: fontWeights.light,
+    letterSpacing: 0.5,
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -398,12 +406,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0E0E0',
   },
   statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontFamily: fonts.light,
+    fontWeight: fontWeights.light,
+    letterSpacing: 0.3,
   },
   statLabel: {
     fontSize: 12,
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.medium,
     marginTop: 4,
+    letterSpacing: 0.5,
   },
   quickActions: {
     flexDirection: 'row',
@@ -429,12 +442,17 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.semibold,
+    letterSpacing: 0.2,
     textAlign: 'center',
     marginBottom: 4,
   },
   actionSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
+    letterSpacing: 0.1,
     textAlign: 'center',
   },
   infoSection: {

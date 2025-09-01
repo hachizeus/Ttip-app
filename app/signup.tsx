@@ -6,6 +6,7 @@ import { generateWorkerID, generateQRData } from '../lib/mpesa'
 import { router } from 'expo-router'
 import { formatPhoneForAPI, validateKenyanPhone } from '../lib/phone-utils'
 import { useTheme, ThemeProvider } from '../lib/theme-context'
+import { fonts, fontWeights } from '../lib/fonts'
 
 function SignupContent() {
   const { colors } = useTheme()
@@ -142,7 +143,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
     textAlign: 'center',
     marginBottom: 30,
   },
@@ -152,6 +154,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginBottom: 10,
     fontSize: 14,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
   },
   genderContainer: {
     flexDirection: 'row',
@@ -167,6 +171,8 @@ const styles = StyleSheet.create({
   },
   genderText: {
     fontSize: 16,
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.medium,
   },
   button: {
     backgroundColor: '#007AFF',
@@ -181,7 +187,8 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
   },
 })
 

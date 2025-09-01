@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native
 import { supabase } from '../../lib/supabase'
 import { useTheme } from '../../lib/theme-context'
 import { MaterialIcons } from '@expo/vector-icons'
+import { fonts, fontWeights } from '../../lib/fonts'
 
 interface Worker {
   id: string
@@ -113,11 +114,14 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
   },
   workerCard: {
     flexDirection: 'row',
@@ -138,18 +142,22 @@ const styles = StyleSheet.create({
   },
   rankText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
   },
   workerInfo: {
     flex: 1,
   },
   workerName: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.semibold,
     marginBottom: 2,
   },
   workerOccupation: {
     fontSize: 12,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
   },
 
   stats: {
@@ -157,12 +165,15 @@ const styles = StyleSheet.create({
   },
   totalTips: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: fonts.light,
+    fontWeight: fontWeights.light,
     color: '#00C851',
     marginBottom: 2,
   },
   tipCount: {
     fontSize: 11,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
   },
   emptyState: {
     alignItems: 'center',
@@ -174,10 +185,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
     marginBottom: 5,
   },
   emptySubtext: {
     fontSize: 14,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
   },
 })

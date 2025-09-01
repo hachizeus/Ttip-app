@@ -17,6 +17,7 @@ import { getBiometricInfo, loginWithBiometric, sendOTP, verifyOTP } from '../lib
 import { formatPhoneForAPI, validateKenyanPhone } from '../lib/phone-utils'
 import { supabase } from '../lib/supabase'
 import { ThemeProvider } from '../lib/theme-context'
+import { fonts, fontWeights } from '../lib/fonts'
 
 function SignInContent() {
   const [step, setStep] = useState<'phone' | 'otp'>('phone')
@@ -310,6 +311,8 @@ const styles = StyleSheet.create({
 
   label: {
     fontSize: 16,
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.medium,
     color: '#999',
     textAlign: 'center',
     marginBottom: 40,
@@ -331,8 +334,9 @@ const styles = StyleSheet.create({
   },
   phoneDigit: {
     fontSize: 18,
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.semibold,
     color: '#fff',
-    fontWeight: '600',
   },
   otpDots: {
     flexDirection: 'row',
@@ -372,8 +376,9 @@ const styles = StyleSheet.create({
   },
   keypadText: {
     fontSize: 24,
+    fontFamily: fonts.light,
+    fontWeight: fontWeights.light,
     color: '#fff',
-    fontWeight: '300',
   },
   keypadRowSmall: {
     marginBottom: 10,
@@ -405,7 +410,8 @@ const styles = StyleSheet.create({
   continueButtonText: {
     color: '#fff',
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.semibold,
   },
   hiddenInput: {
     position: 'absolute',

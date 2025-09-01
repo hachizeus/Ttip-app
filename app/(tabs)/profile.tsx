@@ -8,6 +8,7 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../lib/theme-context'
 import ModalOverlay from '../../components/ModalOverlay'
 import { supabase } from '../../lib/supabase'
+import { fonts, fontWeights } from '../../lib/fonts'
 
 export default function ProfileScreen() {
   const { isDark, toggleTheme, colors } = useTheme()
@@ -277,11 +278,14 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.semibold,
     marginBottom: 2,
   },
   occupation: {
     fontSize: 14,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
     marginBottom: 4,
   },
   phone: {
@@ -303,10 +307,13 @@ const styles = StyleSheet.create({
   planBadgeText: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
   },
   bio: {
     fontSize: 14,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
     lineHeight: 18,
     marginBottom: 12,
   },
@@ -340,11 +347,14 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.medium,
     marginBottom: 2,
   },
   menuSubtext: {
     fontSize: 12,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
   },
   menuArrow: {
     fontSize: 18,
@@ -377,7 +387,8 @@ const styles = StyleSheet.create({
   },
   logoutModalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
   },
   logoutCloseButton: {
     padding: 4,
@@ -391,6 +402,8 @@ const styles = StyleSheet.create({
   },
   logoutMessage: {
     fontSize: 16,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
     textAlign: 'center',
     marginBottom: 24,
   },

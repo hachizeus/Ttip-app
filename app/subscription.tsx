@@ -7,6 +7,7 @@ import { MaterialIcons } from '@expo/vector-icons'
 import { useTheme, ThemeProvider } from '../lib/theme-context'
 import { initiateMpesaPayment } from '../lib/mpesa'
 import ModalOverlay from '../components/ModalOverlay'
+import { fonts, fontWeights } from '../lib/fonts'
 
 function SubscriptionContent() {
   const { colors } = useTheme()
@@ -31,11 +32,14 @@ function SubscriptionContent() {
       
       setUserPhone(phone)
 
-      const { data: worker } = await supabase
+      // Force fresh data from database
+      const { data: worker, error } = await supabase
         .from('workers')
         .select('subscription_plan, subscription_expiry')
         .eq('phone', phone)
         .single()
+
+      console.log('Subscription data loaded:', { worker, error, phone })
 
       if (worker) {
         setSubscription(worker)
@@ -88,9 +92,10 @@ function SubscriptionContent() {
         
         if (result.status === 'success' || result.status === 'completed') {
           setPaymentStatusMessage('Payment successful! Your subscription has been updated.')
-          loadSubscription()
           
-          setTimeout(() => {
+          // Force refresh subscription data
+          setTimeout(async () => {
+            await loadSubscription()
             setShowPaymentStatus(false)
             setPaymentStatusMessage('')
           }, 2000)
@@ -201,7 +206,12 @@ function SubscriptionContent() {
               <MaterialIcons name="diamond" size={24} color={colors.accent} />
               <Text style={[styles.currentPlanTitle, { color: colors.text }]}>Current Plan</Text>
             </View>
-            <Text style={[styles.planName, { color: colors.primary }]}>{subscription.subscription_plan}</Text>
+            <Text style={[styles.planName, { color: colors.primary }]}>
+              {subscription.subscription_plan === 'lite_plan' ? 'Lite Plan' : 
+               subscription.subscription_plan === 'pro_plan' ? 'Pro Plan' :
+               subscription.subscription_plan === 'free' ? 'Free Trial' :
+               subscription.subscription_plan}
+            </Text>
             {subscription.subscription_expiry && (
               <View style={styles.expiryContainer}>
                 <MaterialIcons name="schedule" size={16} color={colors.textSecondary} />
@@ -238,17 +248,25 @@ function SubscriptionContent() {
               ))}
             </View>
             
-            {!plan.highlight ? (
+            {subscription?.subscription_plan === 'lite_plan' && plan.name === 'Lite Plan' ? (
+              <View style={[styles.currentBadge, { backgroundColor: '#00C851' }]}>
+                <Text style={styles.currentBadgeText}>Current Plan</Text>
+              </View>
+            ) : subscription?.subscription_plan === 'pro_plan' && plan.name === 'Pro Plan' ? (
+              <View style={[styles.currentBadge, { backgroundColor: '#00C851' }]}>
+                <Text style={styles.currentBadgeText}>Current Plan</Text>
+              </View>
+            ) : plan.highlight ? (
+              <View style={[styles.currentBadge, { backgroundColor: '#666' }]}>
+                <Text style={styles.currentBadgeText}>Trial Ended</Text>
+              </View>
+            ) : (
               <TouchableOpacity 
                 style={[styles.subscribeButton, { backgroundColor: colors.accent }]}
                 onPress={() => handlePlanSelect(plan)}
               >
                 <Text style={styles.subscribeButtonText}>Subscribe</Text>
               </TouchableOpacity>
-            ) : (
-              <View style={[styles.currentBadge, { backgroundColor: '#00C851' }]}>
-                <Text style={styles.currentBadgeText}>Active</Text>
-              </View>
             )}
           </View>
         ))}
@@ -376,7 +394,8 @@ const styles = StyleSheet.create({
   },
   currentPlanTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.semibold,
     marginLeft: 8,
   },
   expiryContainer: {
@@ -386,16 +405,20 @@ const styles = StyleSheet.create({
   },
   planName: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: fonts.light,
+    fontWeight: fontWeights.light,
     marginBottom: 4,
   },
   expiryText: {
     fontSize: 14,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
     marginLeft: 4,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
     marginBottom: 16,
   },
   planCard: {
@@ -418,12 +441,14 @@ const styles = StyleSheet.create({
   },
   planCardName: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
     marginBottom: 8,
   },
   planPrice: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: fonts.light,
+    fontWeight: fontWeights.light,
     marginBottom: 16,
   },
   featuresContainer: {
@@ -436,6 +461,8 @@ const styles = StyleSheet.create({
   },
   featureText: {
     fontSize: 14,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
     marginLeft: 8,
   },
   subscribeButton: {
@@ -446,7 +473,8 @@ const styles = StyleSheet.create({
   subscribeButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.bold,
+    fontWeight: fontWeights.bold,
   },
   currentBadge: {
     paddingVertical: 14,

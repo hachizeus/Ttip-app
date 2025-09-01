@@ -94,13 +94,19 @@ app.post('/api/callback', async (req, res) => {
                 const expiryDate = new Date();
                 expiryDate.setMonth(expiryDate.getMonth() + 1); // 1 month subscription
                 
-                await supabase
+                const { error: updateError } = await supabase
                     .from('workers')
                     .update({
                         subscription_plan: subscriptionPayment.plan,
                         subscription_expiry: expiryDate.toISOString()
                     })
                     .eq('phone', subscriptionPayment.phone);
+                
+                if (updateError) {
+                    console.error('Error updating worker subscription:', updateError);
+                } else {
+                    console.log(`Worker subscription updated: ${subscriptionPayment.plan} for ${subscriptionPayment.phone}`);
+                }
                 
                 console.log(`Subscription activated: ${subscriptionPayment.plan} for ${subscriptionPayment.phone}`);
                 res.json({ ResultCode: 0, ResultDesc: 'Success' });
