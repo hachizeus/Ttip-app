@@ -116,7 +116,25 @@ export const getBiometricInfo = getBiometricCapability
 
 export const isLoggedIn = async (): Promise<boolean> => {
   const loggedIn = await AsyncStorage.getItem('isLoggedIn')
-  return loggedIn === 'true'
+  if (loggedIn !== 'true') return false
+  
+  // Check if user still exists in database
+  const phone = await AsyncStorage.getItem('userPhone')
+  if (phone) {
+    const { data, error } = await supabase
+      .from('workers')
+      .select('id')
+      .eq('phone', phone)
+      .single()
+    
+    if (error || !data) {
+      // User deleted from database, auto logout
+      await logout()
+      return false
+    }
+  }
+  
+  return true
 }
 
 export const getCurrentUser = async (): Promise<string | null> => {
