@@ -18,7 +18,7 @@ export const sendTipNotification = async (phone, amount) => {
         
         const result = await axios.post(`${INFOBIP_BASE_URL}/sms/2/text/advanced`, {
             messages: [{
-                from: 'TTip',
+                from: '447491163443',
                 destinations: [{
                     to: phone.startsWith('+') ? phone : `+${phone}`
                 }],
@@ -45,7 +45,7 @@ export const sendOTPSMS = async (phone, otp) => {
         
         const result = await axios.post(`${INFOBIP_BASE_URL}/sms/2/text/advanced`, {
             messages: [{
-                from: 'TTip',
+                from: '447491163443',
                 destinations: [{
                     to: phone.startsWith('+') ? phone : `+${phone}`
                 }],
