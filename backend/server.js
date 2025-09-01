@@ -94,10 +94,17 @@ app.post('/api/callback', async (req, res) => {
                 const expiryDate = new Date();
                 expiryDate.setMonth(expiryDate.getMonth() + 1); // 1 month subscription
                 
+                // Map plan names to match database constraints
+                const planMapping = {
+                    'lite_plan': 'lite',
+                    'pro_plan': 'pro'
+                };
+                const dbPlan = planMapping[subscriptionPayment.plan] || subscriptionPayment.plan;
+                
                 const { error: updateError } = await supabase
                     .from('workers')
                     .update({
-                        subscription_plan: subscriptionPayment.plan,
+                        subscription_plan: dbPlan,
                         subscription_expiry: expiryDate.toISOString()
                     })
                     .eq('phone', subscriptionPayment.phone);
@@ -519,6 +526,40 @@ app.post('/api/subscription-payment', async (req, res) => {
     console.log('Subscription payment request:', { phone, amount, plan });
     
     try {
+        // Check current subscription status
+        const { data: worker } = await supabase
+            .from('workers')
+            .select('subscription_plan, subscription_expiry')
+            .eq('phone', phone)
+            .single();
+        
+        if (worker) {
+            const now = new Date();
+            const expiry = worker.subscription_expiry ? new Date(worker.subscription_expiry) : null;
+            const hasActiveSubscription = expiry && now < expiry;
+            
+            // Prevent duplicate subscription to same plan
+            if (hasActiveSubscription && worker.subscription_plan === plan.replace('_plan', '')) {
+                return res.json({ 
+                    success: false, 
+                    error: `You already have an active ${plan.replace('_', ' ')}. It expires on ${expiry.toLocaleDateString()}.` 
+                });
+            }
+            
+            // Allow upgrades from lite to pro
+            if (hasActiveSubscription && worker.subscription_plan === 'lite' && plan === 'pro_plan') {
+                console.log('Allowing upgrade from Lite to Pro plan');
+            }
+            
+            // Prevent downgrades from pro to lite
+            if (hasActiveSubscription && worker.subscription_plan === 'pro' && plan === 'lite_plan') {
+                return res.json({ 
+                    success: false, 
+                    error: 'Cannot downgrade from Pro to Lite plan. Please wait for your current subscription to expire.' 
+                });
+            }
+        }
+        
         // Initiate M-Pesa payment
         const paymentResponse = await initiateMpesaPayment(phone, parseFloat(amount), `subscription_${plan}`);
         console.log('Subscription payment response:', paymentResponse);
