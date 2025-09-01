@@ -21,7 +21,7 @@ const statusResponse = await fetch('/api/payment-status/' + result.checkoutReque
 - Wait for "Deploy successful" message
 
 ## 🧪 **Test After Deploy:**
-1. Visit: https://ttip-backend.onrender.com/tip/W12345678
+1. Visit: https://ttip-app.onrender.com/tip/W12345678
 2. Enter amount and phone
 3. Click "Send STK Push"
 4. Should show loading state without errors

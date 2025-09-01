@@ -43,7 +43,7 @@ function SignupContent() {
           phone: apiPhone,
           worker_id: workerID,
           qr_code: qrData,
-          subscription_plan: 'trial', // 7-day trial with Pro features
+          subscription_plan: 'free', // Start with free plan
           subscription_expiry: trialExpiry.toISOString(),
           total_tips: 0,
           tip_count: 0
@@ -56,10 +56,10 @@ function SignupContent() {
       await AsyncStorage.setItem('isLoggedIn', 'true')
       await AsyncStorage.setItem('userName', name)
       
-      // Store session token for biometric auth
-      const { storeSessionToken } = await import('../lib/biometric-auth')
-      const sessionToken = `${apiPhone}_${Date.now()}`
-      await storeSessionToken(sessionToken)
+      // Biometric auth disabled for Expo Go
+      // const { storeSessionToken } = await import('../lib/biometric-auth')
+      // const sessionToken = `${apiPhone}_${Date.now()}`
+      // await storeSessionToken(sessionToken)
       
       Alert.alert('Success', 'Account created successfully!', [
         { text: 'OK', onPress: () => {

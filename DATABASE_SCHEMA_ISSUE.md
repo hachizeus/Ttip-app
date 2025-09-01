@@ -17,7 +17,7 @@ Database error: {
 
 **Payment was successful** (Receipt: `THV2P64IEA`), manually complete it:
 
-Visit: `https://ttip-backend.onrender.com/api/complete-payment/ws_CO_310820250053371721475448`
+Visit: `https://ttip-app.onrender.com/api/complete-payment/ws_CO_310820250053371721475448`
 
 ## 🔧 **Database Schema Fix Needed:**
 

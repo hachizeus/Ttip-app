@@ -19,11 +19,11 @@
 - Auto-stops checking after 2 minutes
 
 ### 4. **Callback URL:**
-- Fixed to use backend callback: `https://ttip-backend.onrender.com/api/callback`
+- Fixed to use backend callback: `https://ttip-app.onrender.com/api/callback`
 - Proper M-Pesa callback handling for payment confirmation
 
 ## 🧪 **Test Complete Flow:**
-1. Visit: https://ttip-backend.onrender.com/tip/W12345678
+1. Visit: https://ttip-app.onrender.com/tip/W12345678
 2. Enter amount: 1, phone: 0721475448
 3. Click "Send STK Push"
 4. See loading state: "Processing payment..."

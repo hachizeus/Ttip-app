@@ -22,7 +22,7 @@
 - Add environment variables
 
 ### 2. **Update Backend URL:**
-- Replace `https://ttip-backend.onrender.com` with actual Render URL
+- Replace `https://ttip-app.onrender.com` with actual Render URL
 - Update in app and QR codes
 
 ### 3. **Test Complete Flow:**

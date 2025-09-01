@@ -1,22 +1,30 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Switch, Modal } from 'react-native'
-import { router } from 'expo-router'
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Switch, Modal, Image } from 'react-native'
+import { router, useFocusEffect } from 'expo-router'
 import { getCurrentUser, logout } from '../../lib/auth'
 import { formatPhoneForDisplay } from '../../lib/phone-utils'
 import { getSubscriptionStatus } from '../../lib/subscription-utils'
 import { MaterialIcons, Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../lib/theme-context'
 import ModalOverlay from '../../components/ModalOverlay'
+import { supabase } from '../../lib/supabase'
 
 export default function ProfileScreen() {
   const { isDark, toggleTheme, colors } = useTheme()
   const [userPhone, setUserPhone] = useState('')
   const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [userProfile, setUserProfile] = useState<any>(null)
 
   useEffect(() => {
     loadUserData()
   }, [])
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadUserData()
+    }, [])
+  )
 
   const loadUserData = async () => {
     const phone = await getCurrentUser()
@@ -26,6 +34,21 @@ export default function ProfileScreen() {
       // Load subscription status
       const status = await getSubscriptionStatus(phone)
       setSubscriptionStatus(status)
+      
+      // Load user profile data
+      try {
+        const { data: worker, error } = await supabase
+          .from('workers')
+          .select('name, occupation, bio, profile_image_url')
+          .eq('phone', phone)
+          .single()
+        
+        if (!error && worker) {
+          setUserProfile(worker)
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error)
+      }
     }
   }
 
@@ -40,35 +63,50 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.profileCard, { backgroundColor: colors.card, marginTop: 60 }]}>
-        <View style={[styles.avatarContainer, { backgroundColor: colors.primary }]}>
-          <MaterialIcons name="person" size={40} color="#fff" />
-        </View>
-        <Text style={[styles.phone, { color: colors.text }]}>{userPhone}</Text>
-        <Text style={[styles.bio, { color: colors.textSecondary }]}>Passionate service worker dedicated to excellence</Text>
-        {subscriptionStatus && (
-          <View style={styles.subscriptionInfo}>
-            <View style={[
-              styles.planBadge,
-              { backgroundColor: subscriptionStatus.isLimitedMode ? '#FF6B6B' : '#00C851' }
-            ]}>
-              <Text style={styles.planBadgeText}>
-                {subscriptionStatus.plan === 'trial' ? 'Free Trial' :
-                 subscriptionStatus.plan === 'free' ? 'Limited Mode' :
-                 subscriptionStatus.plan.charAt(0).toUpperCase() + subscriptionStatus.plan.slice(1)}
-              </Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Fixed Profile Section */}
+      <View style={[styles.fixedProfileSection, { backgroundColor: colors.background }]}>
+        <View style={styles.profileHeader}>
+          {userProfile?.profile_image_url ? (
+            <Image source={{ uri: userProfile.profile_image_url }} style={styles.profileImage} />
+          ) : (
+            <View style={[styles.avatarContainer, { backgroundColor: colors.primary }]}>
+              <MaterialIcons name="person" size={30} color="#fff" />
             </View>
-            {subscriptionStatus.isLimitedMode && (
-              <Text style={styles.limitedText}>Cannot receive new tips</Text>
+          )}
+          <View style={styles.profileInfo}>
+            {userProfile?.name && (
+              <Text style={[styles.name, { color: colors.text }]}>{userProfile.name}</Text>
             )}
+            {userProfile?.occupation && (
+              <Text style={[styles.occupation, { color: colors.textSecondary }]}>{userProfile.occupation}</Text>
+            )}
+          </View>
+        </View>
+        
+        <Text style={[styles.bio, { color: colors.text }]}>
+          {userProfile?.bio || 'No bio available. Update your profile in settings.'}
+        </Text>
+        
+        {subscriptionStatus && (
+          <View style={[
+            styles.planBadge,
+            { backgroundColor: subscriptionStatus.isLimitedMode ? '#FF6B6B' : '#00C851' }
+          ]}>
+            <Text style={styles.planBadgeText}>
+              {subscriptionStatus.plan === 'trial' ? 'Free Trial' :
+               subscriptionStatus.plan === 'free' ? 'Limited Mode' :
+               subscriptionStatus.plan.charAt(0).toUpperCase() + subscriptionStatus.plan.slice(1)}
+            </Text>
           </View>
         )}
       </View>
 
-      <View style={styles.menu}>
+      {/* Scrollable Menu */}
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        <View style={[styles.menu, { marginTop: 20 }]}>
         <TouchableOpacity 
-          style={[styles.menuItem, { backgroundColor: colors.card }]}
+          style={[styles.menuItem, { backgroundColor: colors.background }]}
           onPress={() => router.push('/qr-code')}
         >
           <View style={[styles.menuIconContainer, { backgroundColor: colors.primary }]}>
@@ -82,7 +120,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.menuItem, { backgroundColor: colors.card }]}
+          style={[styles.menuItem, { backgroundColor: colors.background }]}
           onPress={() => router.push('/subscription')}
         >
           <View style={[styles.menuIconContainer, { backgroundColor: colors.primary }]}>
@@ -95,7 +133,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
 
-        <View style={[styles.menuItem, { backgroundColor: colors.card }]}>
+        <View style={[styles.menuItem, { backgroundColor: colors.background }]}>
           <View style={[styles.menuIconContainer, { backgroundColor: colors.primary }]}>
             <MaterialIcons name="palette" size={20} color="#fff" />
           </View>
@@ -112,7 +150,7 @@ export default function ProfileScreen() {
         </View>
 
         <TouchableOpacity 
-          style={[styles.menuItem, { backgroundColor: colors.card }]}
+          style={[styles.menuItem, { backgroundColor: colors.background }]}
           onPress={() => router.push('/settings')}
         >
           <View style={[styles.menuIconContainer, { backgroundColor: colors.primary }]}>
@@ -126,7 +164,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.menuItem, { backgroundColor: colors.card }]}
+          style={[styles.menuItem, { backgroundColor: colors.background }]}
           onPress={() => router.push('/leaderboard')}
         >
           <View style={[styles.menuIconContainer, { backgroundColor: colors.primary }]}>
@@ -140,7 +178,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.menuItem, styles.logoutItem, { backgroundColor: colors.card }]}
+          style={[styles.menuItem, styles.logoutItem, { backgroundColor: colors.background }]}
           onPress={handleLogout}
         >
           <MaterialIcons name="logout" size={24} color="#FF3B30" style={styles.menuIcon} />
@@ -192,7 +230,8 @@ export default function ProfileScreen() {
           </View>
         </ModalOverlay>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </View>
   )
 }
 
@@ -201,14 +240,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-
-  profileCard: {
-    margin: 16,
-    padding: 24,
-    borderRadius: 16,
-    alignItems: 'center',
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+  fixedProfileSection: {
+    paddingTop: 60,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    zIndex: 1000,
     elevation: 5,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: 150,
+  },
+
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   avatarContainer: {
     width: 80,
@@ -216,7 +264,25 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginRight: 16,
+  },
+  profileImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginRight: 16,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  name: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  occupation: {
+    fontSize: 14,
+    marginBottom: 4,
   },
   phone: {
     fontSize: 20,
@@ -228,15 +294,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  subscriptionInfo: {
-    alignItems: 'center',
-    marginTop: 8,
-  },
   planBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
   },
   planBadgeText: {
     color: '#fff',
@@ -245,11 +307,8 @@ const styles = StyleSheet.create({
   },
   bio: {
     fontSize: 14,
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 16,
-    paddingHorizontal: 20,
-    lineHeight: 20,
+    lineHeight: 18,
+    marginBottom: 12,
   },
   limitedText: {
     fontSize: 12,

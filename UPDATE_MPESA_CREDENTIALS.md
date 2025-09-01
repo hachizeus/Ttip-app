@@ -19,7 +19,7 @@
 - Wait for "Deploy successful" message
 
 ### 4. **Test STK Push:**
-- Visit: https://ttip-backend.onrender.com/tip/W12345678
+- Visit: https://ttip-app.onrender.com/tip/W12345678
 - Enter amount: 1
 - Enter phone: 0721475448
 - Click "Send STK Push"

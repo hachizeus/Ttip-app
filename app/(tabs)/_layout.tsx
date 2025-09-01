@@ -5,6 +5,8 @@ import { isLoggedIn, getCurrentUser } from '../../lib/auth';
 import { shouldShowGraceScreen } from '../../lib/subscription-utils';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ThemeProvider, useTheme } from '../../lib/theme-context';
+import HomeIcon from '../../components/icons/HomeIcon';
+import LeaderboardIcon from '../../components/icons/LeaderboardIcon';
 
 import { HapticTab } from '@/components/HapticTab';
 import TabBarBackground from '@/components/ui/TabBarBackground';
@@ -38,7 +40,7 @@ function TabsContent() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#00C851',
+        tabBarActiveTintColor: '#0052CC',
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
@@ -55,16 +57,17 @@ function TabsContent() {
           right: 0,
         },
         tabBarShowLabel: false,
+
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: '',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialIcons 
-              name="home" 
-              size={focused ? 32 : 28} 
-              color={focused ? '#00C851' : '#666'} 
+            <HomeIcon 
+              size={focused ? 26 : 24} 
+              color={focused ? '#0052CC' : '#999ca0'} 
+              focused={focused}
             />
           ),
         }}
@@ -74,10 +77,10 @@ function TabsContent() {
         options={{
           title: '',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialIcons 
-              name="bar-chart" 
-              size={focused ? 32 : 28} 
-              color={focused ? '#00C851' : '#666'} 
+            <LeaderboardIcon 
+              size={focused ? 26 : 24} 
+              color={focused ? '#FF6B00' : '#999ca0'} 
+              focused={focused}
             />
           ),
         }}
@@ -88,15 +91,45 @@ function TabsContent() {
           title: '',
           tabBarIcon: ({ color, focused }) => (
             <MaterialIcons 
-              name="person" 
-              size={focused ? 32 : 28} 
-              color={focused ? '#00C851' : '#666'} 
+              name="person-outline" 
+              size={focused ? 26 : 24} 
+              color={focused ? '#0052CC' : '#999ca0'} 
             />
           ),
         }}
       />
       <Tabs.Screen
         name="explore"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="../analytics"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="../qr-code"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="../scanner"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="../settings"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="../subscription"
         options={{
           href: null,
         }}

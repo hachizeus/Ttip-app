@@ -7,12 +7,12 @@
 ## 🧪 **Test Endpoints Available:**
 
 ### 1. **Environment Check:**
-https://ttip-backend.onrender.com/env-check
+https://ttip-app.onrender.com/env-check
 - Shows credential previews
 - Verifies all environment variables
 
 ### 2. **M-Pesa Credentials Test:**
-https://ttip-backend.onrender.com/test-mpesa
+https://ttip-app.onrender.com/test-mpesa
 - Tests M-Pesa authentication
 - Validates credentials directly
 

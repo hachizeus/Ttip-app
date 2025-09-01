@@ -1,7 +1,7 @@
 # 🎉 Backend Live - SUCCESS!
 
 ## ✅ **Live Backend URL:**
-**https://ttip-backend.onrender.com**
+**https://ttip-app.onrender.com**
 
 ## 📱 **App Updated:**
 - Backend URL updated in `.env`
@@ -18,7 +18,7 @@ npx expo start
 ### 1. **QR Code Generation:**
 - Login to app
 - Click "My QR Code"
-- QR contains: `https://ttip-backend.onrender.com/tip/W12345678`
+- QR contains: `https://ttip-app.onrender.com/tip/W12345678`
 
 ### 2. **External Scanning:**
 - Scan QR with Google camera

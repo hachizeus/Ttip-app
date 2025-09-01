@@ -10,7 +10,7 @@
 - `SHORT_CODE` = `174379`
 - `PASSKEY` = `bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919`
 - `BASE_URL` = `https://sandbox.safaricom.co.ke`
-- `CALLBACK_URL` = `https://ttip-backend.onrender.com/api/callback`
+- `CALLBACK_URL` = `https://ttip-app.onrender.com/api/callback`
 
 ### **Also Add (if not present):**
 - `SUPABASE_URL` = `https://cpbonffjhrckiiqbsopt.supabase.co`
@@ -22,7 +22,7 @@
 - Wait for "Deploy successful"
 
 ### **Test STK Push:**
-- Visit: https://ttip-backend.onrender.com/tip/W12345678
+- Visit: https://ttip-app.onrender.com/tip/W12345678
 - Enter amount: 1
 - Enter phone: 0721475448
 - Click "Send STK Push"

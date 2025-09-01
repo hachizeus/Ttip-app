@@ -15,7 +15,7 @@
 - STK push should work
 
 ## 🧪 **Test Again:**
-1. Visit: `https://ttip-backend.onrender.com/env-check`
+1. Visit: `https://ttip-app.onrender.com/env-check`
 2. Should show: `"baseUrl": "https://sandbox.safaricom.co.ke"`
 3. Test STK push on web page
 

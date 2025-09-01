@@ -14,7 +14,7 @@ Since the worker didn't exist when the callback was processed, manually complete
 
 **Visit this URL:**
 ```
-https://ttip-backend.onrender.com/api/complete-payment/ws_CO_310820250050277721475448
+https://ttip-app.onrender.com/api/complete-payment/ws_CO_310820250050277721475448
 ```
 
 This will:
@@ -25,7 +25,7 @@ This will:
 
 ## 🧪 **Test New Payment:**
 After backend redeploys:
-1. Visit: https://ttip-backend.onrender.com/tip/W12345678
+1. Visit: https://ttip-app.onrender.com/tip/W12345678
 2. Enter amount: 1, phone: 0721475448
 3. Worker will be created automatically
 4. Payment should complete end-to-end

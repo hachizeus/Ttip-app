@@ -12,7 +12,7 @@ Added fallback in M-Pesa callback to create tip record if it doesn't exist.
 ## 📱 **For Current Stuck Payment:**
 **Manual Complete**: Visit this URL to complete the current payment:
 ```
-https://ttip-backend.onrender.com/api/complete-payment/ws_CO_310820250139471721475448
+https://ttip-app.onrender.com/api/complete-payment/ws_CO_310820250139471721475448
 ```
 
 ## 🧪 **Test New Payment:**

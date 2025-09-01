@@ -20,7 +20,7 @@
 4. Save changes
 
 ### **Test with Short ID:**
-Visit: `https://ttip-backend.onrender.com/tip/VG001`
+Visit: `https://ttip-app.onrender.com/tip/VG001`
 - Enter amount: 1
 - Enter phone: 0721475448
 - Payment should work end-to-end

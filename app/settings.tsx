@@ -6,7 +6,6 @@ import { supabase } from '../lib/supabase'
 import { MaterialIcons } from '@expo/vector-icons'
 import { useTheme, ThemeProvider } from '../lib/theme-context'
 import * as ImagePicker from 'expo-image-picker'
-import * as FileSystem from 'expo-file-system'
 
 function SettingsContent() {
   const { colors } = useTheme()
@@ -51,21 +50,37 @@ function SettingsContent() {
   }
 
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please grant permission to access photos')
-      return
-    }
+    try {
+      console.log('📷 Starting image picker...')
+      
+      // Request permission first
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      console.log('📷 Permission status:', status)
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant permission to access photos')
+        return
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    })
+      console.log('📷 Launching image library...')
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      })
 
-    if (!result.canceled) {
-      uploadImage(result.assets[0].uri)
+      console.log('📷 Image picker result:', result)
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        console.log('📷 Image selected, uploading...')
+        uploadImage(result.assets[0].uri)
+      } else {
+        console.log('📷 Image picker was canceled')
+      }
+    } catch (error) {
+      console.error('📷 Image picker error:', error)
+      Alert.alert('Error', 'Failed to open image picker: ' + error.message)
     }
   }
 
@@ -73,12 +88,10 @@ function SettingsContent() {
     try {
       setLoading(true)
       
-      const fileExt = uri.split('.').pop()
+      const fileExt = uri.split('.').pop() || 'jpg'
       const fileName = `${userPhone}/${Date.now()}.${fileExt}`
       
-      const fileInfo = await FileSystem.getInfoAsync(uri)
       const formData = new FormData()
-      
       formData.append('file', {
         uri,
         type: `image/${fileExt}`,
@@ -146,15 +159,15 @@ function SettingsContent() {
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
         <TouchableOpacity onPress={saveSettings} style={styles.saveButton} disabled={loading}>
-          <Text style={[styles.saveText, { color: colors.primary }]}>Save</Text>
+          <Text style={[styles.saveText, { color: colors.accent }]}>Save</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Profile Picture */}
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <View style={[styles.section, { backgroundColor: colors.background }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Profile Picture</Text>
-          <TouchableOpacity onPress={pickImage} style={styles.imageContainer}>
+          <View style={styles.imageContainer}>
             {profileImage ? (
               <Image source={{ uri: profileImage }} style={styles.profileImage} />
             ) : (
@@ -162,14 +175,14 @@ function SettingsContent() {
                 <MaterialIcons name="person" size={40} color={colors.textSecondary} />
               </View>
             )}
-            <View style={[styles.editIcon, { backgroundColor: colors.primary }]}>
+            <TouchableOpacity onPress={pickImage} style={[styles.editIcon, { backgroundColor: colors.accent }]}>
               <MaterialIcons name="edit" size={16} color="#fff" />
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Personal Info */}
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <View style={[styles.section, { backgroundColor: colors.background }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Personal Information</Text>
           
           <View style={styles.inputGroup}>
@@ -248,9 +261,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  content: {
-    flex: 1,
+  scrollContainer: {
+    flexGrow: 1,
     padding: 16,
+    paddingBottom: 100,
   },
   section: {
     padding: 20,
@@ -282,13 +296,15 @@ const styles = StyleSheet.create({
   },
   editIcon: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    bottom: -5,
+    right: -5,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   inputGroup: {
     marginBottom: 16,

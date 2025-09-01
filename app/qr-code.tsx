@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, Alert, TouchableOpacity, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, Alert, TouchableOpacity, ScrollView, Modal } from 'react-native'
 import { router } from 'expo-router'
 import { getCurrentUser } from '../lib/auth'
 import { supabase } from '../lib/supabase'
@@ -8,13 +8,17 @@ import { MaterialIcons } from '@expo/vector-icons'
 import { useTheme, ThemeProvider } from '../lib/theme-context'
 import * as MediaLibrary from 'expo-media-library'
 import * as FileSystem from 'expo-file-system'
-import { captureRef } from 'react-native-view-shot'
+import ViewShot from 'react-native-view-shot'
+import ModalOverlay from '../components/ModalOverlay'
 
 function QRCodeContent() {
   const { colors } = useTheme()
   const [workerID, setWorkerID] = useState('')
   const [loading, setLoading] = useState(true)
-  const qrRef = useRef(null)
+  const [showAlert, setShowAlert] = useState(false)
+  const [alertMessage, setAlertMessage] = useState('')
+  const [alertType, setAlertType] = useState<'success' | 'error'>('success')
+  const qrRef = useRef<any>(null)
 
   useEffect(() => {
     loadWorkerData()
@@ -41,29 +45,29 @@ function QRCodeContent() {
     }
   }
 
+  const showCustomAlert = (message: string, type: 'success' | 'error') => {
+    setAlertMessage(message)
+    setAlertType(type)
+    setShowAlert(true)
+    setTimeout(() => setShowAlert(false), 3000)
+  }
+
   const downloadQR = async () => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync()
       if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant permission to save images')
+        showCustomAlert('Please grant permission to save images', 'error')
         return
       }
 
-      const uri = await captureRef(qrRef, {
-        format: 'png',
-        quality: 1,
-        backgroundColor: '#ffffff',
-        width: 300,
-        height: 300,
-      })
-
+      const uri = await qrRef.current?.capture()
       const asset = await MediaLibrary.createAssetAsync(uri)
       await MediaLibrary.createAlbumAsync('TTip QR Codes', asset, false)
       
-      Alert.alert('Success', 'QR code saved to gallery!')
+      showCustomAlert('QR code saved to gallery!', 'success')
     } catch (error) {
       console.error('Download error:', error)
-      Alert.alert('Error', 'Failed to save QR code')
+      showCustomAlert('Failed to save QR code', 'error')
     }
   }
 
@@ -82,7 +86,7 @@ function QRCodeContent() {
           <MaterialIcons name="qr-code" size={32} color={colors.primary} />
           <Text style={[styles.headerTitle, { color: colors.text }]}>My QR Code</Text>
           <TouchableOpacity onPress={downloadQR} style={styles.downloadButton}>
-            <MaterialIcons name="download" size={24} color={colors.primary} />
+            <MaterialIcons name="download" size={24} color={colors.accent} />
           </TouchableOpacity>
         </View>
         <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
@@ -90,20 +94,26 @@ function QRCodeContent() {
         </Text>
       </View>
       
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {workerID && (
-          <View style={[styles.qrContainer, { backgroundColor: colors.card }]}>
-            <View ref={qrRef} style={[styles.qrWrapper, { backgroundColor: '#ffffff' }]}>
-              <QRCode
-                value={`https://ttip-backend.onrender.com/tip/${workerID}`}
-                size={220}
-                backgroundColor="#ffffff"
-                color="#000000"
-                logo={require('../assets/images/icon.png')}
-                logoSize={40}
-                logoBackgroundColor="#ffffff"
-                logoMargin={2}
-              />
+          <View style={[styles.qrContainer, { backgroundColor: colors.background }]}>
+            <View style={[styles.qrWrapper, { backgroundColor: '#ffffff' }]}>
+              <ViewShot ref={qrRef} options={{ format: 'png', quality: 1.0 }}>
+                <View style={styles.qrDownloadContainer}>
+                  <QRCode
+                    value={`${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-app.onrender.com'}/tip/${workerID}?ref=qrpage&worker=${workerID}&timestamp=${Date.now()}&data=complex`}
+                    size={220}
+                    backgroundColor="#ffffff"
+                    color="#000000"
+                    logo={require('../assets/images/mylogo.png')}
+                    logoSize={50}
+                    logoBackgroundColor="#ffffff"
+                    logoMargin={4}
+                    logoBorderRadius={25}
+                    ecl="M"
+                  />
+                </View>
+              </ViewShot>
             </View>
             <View style={styles.qrInfo}>
               <Text style={[styles.workerIdLabel, { color: colors.textSecondary }]}>Worker ID</Text>
@@ -112,8 +122,8 @@ function QRCodeContent() {
           </View>
         )}
         
-        <View style={[styles.instructionCard, { backgroundColor: colors.card }]}>
-          <MaterialIcons name="info" size={24} color={colors.primary} style={styles.infoIcon} />
+        <View style={[styles.instructionCard, { backgroundColor: colors.background }]}>
+          <MaterialIcons name="info" size={24} color={colors.accent} style={styles.infoIcon} />
           <Text style={[styles.instruction, { color: colors.text }]}>
             Show this QR code to customers who want to tip you. They can scan it with any QR code scanner.
           </Text>
@@ -147,6 +157,21 @@ function QRCodeContent() {
           </View>
         </View>
       </ScrollView>
+
+      <Modal visible={showAlert} transparent animationType="fade">
+        <ModalOverlay visible={showAlert}>
+          <View style={styles.alertContainer}>
+            <View style={[styles.alertContent, { backgroundColor: colors.background }]}>
+              <MaterialIcons 
+                name={alertType === 'success' ? 'check-circle' : 'error'} 
+                size={48} 
+                color={alertType === 'success' ? '#00C851' : '#ff4444'} 
+              />
+              <Text style={[styles.alertMessage, { color: colors.text }]}>{alertMessage}</Text>
+            </View>
+          </View>
+        </ModalOverlay>
+      </Modal>
     </View>
   )
 }
@@ -187,10 +212,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
-  content: {
-    flex: 1,
+  scrollContainer: {
+    flexGrow: 1,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 100,
   },
   qrContainer: {
     padding: 24,
@@ -208,6 +233,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     marginBottom: 16,
+  },
+  qrDownloadContainer: {
+    backgroundColor: '#ffffff',
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
   },
   qrInfo: {
     alignItems: 'center',
@@ -274,5 +306,29 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     marginTop: 100,
+  },
+  alertContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  alertContent: {
+    width: '100%',
+    maxWidth: 280,
+    padding: 30,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  alertMessage: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 16,
+    lineHeight: 22,
   },
 })

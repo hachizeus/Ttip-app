@@ -10,7 +10,10 @@ interface ThemeContextType {
     text: string
     textSecondary: string
     primary: string
+    accent: string
     border: string
+    success: string
+    error: string
   }
 }
 
@@ -53,12 +56,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }
 
   const colors = {
-    background: isDark ? '#1a1a1a' : '#f5f5f5',
-    card: isDark ? '#2a2a2a' : '#ffffff',
+    background: isDark ? '#1a1a1a' : '#ffffff',
+    card: isDark ? '#2a2a2a' : '#f8f9fa',
     text: isDark ? '#ffffff' : '#1a1a1a',
-    textSecondary: isDark ? '#cccccc' : '#666666',
-    primary: '#007AFF',
-    border: isDark ? '#333333' : '#e0e0e0',
+    textSecondary: isDark ? '#999ca0' : '#999ca0',
+    primary: '#0052CC',
+    accent: '#FF6B00',
+    border: isDark ? '#333333' : '#e8e8e8',
+    success: '#00C851',
+    error: '#ff4444',
   }
 
   return (

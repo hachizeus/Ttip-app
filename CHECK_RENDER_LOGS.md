@@ -13,7 +13,7 @@
 - Keep logs open
 
 ### 3. **Test STK Push:**
-- Visit: https://ttip-backend.onrender.com/tip/W12345678
+- Visit: https://ttip-app.onrender.com/tip/W12345678
 - Enter amount: 100
 - Enter phone: 0721475448
 - Click "Send STK Push"

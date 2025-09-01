@@ -3,14 +3,14 @@
 ## 📋 **Check These URLs:**
 
 ### 1. **Environment Check:**
-https://ttip-backend.onrender.com/env-check
+https://ttip-app.onrender.com/env-check
 
 **Should show:**
 - `consumerKeyPreview: "Z4i4Vgqbk..."`
 - `consumerSecretPreview: "GYS1n9YD6..."`
 
 ### 2. **M-Pesa Credentials Test:**
-https://ttip-backend.onrender.com/test-mpesa
+https://ttip-app.onrender.com/test-mpesa
 
 **Should show:**
 - `{"success": true, "message": "M-Pesa credentials are valid!"}`

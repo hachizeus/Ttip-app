@@ -23,7 +23,7 @@
 5. **Button turns green** → "Payment Complete ✅"
 
 ## 🧪 **Test Real-Time Updates:**
-1. Visit: https://ttip-backend.onrender.com/tip/VG001
+1. Visit: https://ttip-app.onrender.com/tip/VG001
 2. Enter amount: 1, phone: 0721475448
 3. Click "Send STK Push"
 4. **See countdown**: "Checking... (58s remaining)"

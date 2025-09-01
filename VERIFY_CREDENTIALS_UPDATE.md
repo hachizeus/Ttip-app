@@ -5,7 +5,7 @@
 ## 🔧 **Verification Steps:**
 
 ### 1. **Check Environment Variables Updated:**
-Visit: https://ttip-backend.onrender.com/env-check
+Visit: https://ttip-app.onrender.com/env-check
 
 Should show:
 ```json

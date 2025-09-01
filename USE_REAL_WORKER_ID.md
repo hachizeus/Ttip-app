@@ -8,11 +8,11 @@
 ## ✅ **Solution:**
 
 ### **Use Real Worker ID in QR Code:**
-Instead of: `https://ttip-backend.onrender.com/tip/W12345678`
-Use: `https://ttip-backend.onrender.com/tip/43f0da6e-2afe-4520-920b-ca50aa033591`
+Instead of: `https://ttip-app.onrender.com/tip/W12345678`
+Use: `https://ttip-app.onrender.com/tip/43f0da6e-2afe-4520-920b-ca50aa033591`
 
 ### **Test with Real Worker:**
-1. **Visit**: https://ttip-backend.onrender.com/tip/43f0da6e-2afe-4520-920b-ca50aa033591
+1. **Visit**: https://ttip-app.onrender.com/tip/43f0da6e-2afe-4520-920b-ca50aa033591
 2. **Enter amount**: 1
 3. **Enter phone**: 0721475448
 4. **Click "Send STK Push"**

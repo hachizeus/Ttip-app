@@ -81,27 +81,11 @@ function SubscriptionContent() {
     
     const poll = async () => {
       try {
-        const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-backend.onrender.com'}/api/payment-status`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ CheckoutRequestID: checkoutID })
-        })
+        const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-app.onrender.com'}/api/subscription-status/${checkoutID}`)
         
         const result = await response.json()
         
-        if (result.status === 'SUCCESS') {
-          // Payment successful
-          const expiryDate = new Date()
-          expiryDate.setMonth(expiryDate.getMonth() + 1)
-          
-          await supabase
-            .from('workers')
-            .update({
-              subscription_plan: selectedPlan.name,
-              subscription_expiry: expiryDate.toISOString()
-            })
-            .eq('phone', userPhone)
-          
+        if (result.status === 'completed') {
           setPaymentStatusMessage('Payment successful! Your subscription has been updated.')
           loadSubscription()
           
@@ -110,7 +94,7 @@ function SubscriptionContent() {
             setPaymentStatusMessage('')
           }, 3000)
           
-        } else if (result.status === 'FAILED' || result.status === 'CANCELLED') {
+        } else if (result.status === 'failed') {
           setPaymentStatusMessage('Payment failed or was cancelled. Please try again.')
           
           setTimeout(() => {
@@ -149,20 +133,39 @@ function SubscriptionContent() {
     
     setPaymentLoading(true)
     try {
-      const result = await initiateMpesaPayment(userPhone, selectedPlan.amount, 'SUBSCRIPTION')
+      const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-app.onrender.com'}/api/subscription-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          phone: userPhone, 
+          amount: selectedPlan.amount,
+          plan: selectedPlan.name.toLowerCase().replace(' ', '_')
+        })
+      })
       
-      if (result.CheckoutRequestID) {
+      const text = await response.text()
+      let result
+      try {
+        result = JSON.parse(text)
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError, 'Response text:', text)
+        Alert.alert('Error', 'Invalid response from server')
+        return
+      }
+      
+      if (result.success && result.checkoutRequestID) {
         setShowPaymentModal(false)
-        setCheckoutRequestID(result.CheckoutRequestID)
+        setCheckoutRequestID(result.checkoutRequestID)
         setPaymentStatusMessage('Payment initiated. Please complete on your phone...')
         setShowPaymentStatus(true)
         
         // Start polling for payment status
-        pollPaymentStatus(result.CheckoutRequestID)
+        pollPaymentStatus(result.checkoutRequestID)
       } else {
-        Alert.alert('Payment Failed', result.errorMessage || 'Could not initiate payment')
+        Alert.alert('Payment Failed', result.error || 'Could not initiate payment')
       }
     } catch (error) {
+      console.error('Payment error:', error)
       Alert.alert('Error', 'Payment failed. Please try again.')
     } finally {
       setPaymentLoading(false)
@@ -171,11 +174,12 @@ function SubscriptionContent() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={[styles.content, { marginTop: 60 }]} contentContainerStyle={styles.scrollContent}>
+      {/* Fixed Current Plan Section */}
+      <View style={[styles.fixedSection, { backgroundColor: colors.background }]}>
         {subscription && (
-          <View style={[styles.currentPlan, { backgroundColor: colors.card }]}>
+          <View style={[styles.currentPlan, { backgroundColor: colors.background }]}>
             <View style={styles.currentPlanHeader}>
-              <MaterialIcons name="diamond" size={24} color={colors.primary} />
+              <MaterialIcons name="diamond" size={24} color={colors.accent} />
               <Text style={[styles.currentPlanTitle, { color: colors.text }]}>Current Plan</Text>
             </View>
             <Text style={[styles.planName, { color: colors.primary }]}>{subscription.subscription_plan}</Text>
@@ -189,18 +193,21 @@ function SubscriptionContent() {
             )}
           </View>
         )}
+      </View>
 
+      {/* Scrollable Content */}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Available Plans</Text>
 
         {plans.map((plan, index) => (
           <View key={index} style={[
             styles.planCard, 
-            { backgroundColor: colors.card },
+            { backgroundColor: colors.background },
             plan.highlight && styles.highlightedPlan
           ]}>
             <View style={styles.planHeader}>
               <Text style={[styles.planCardName, { color: colors.text }]}>{plan.name}</Text>
-              <Text style={[styles.planPrice, { color: colors.primary }]}>{plan.price}</Text>
+              <Text style={[styles.planPrice, { color: colors.accent }]}>{plan.price}</Text>
             </View>
             
             <View style={styles.featuresContainer}>
@@ -214,7 +221,7 @@ function SubscriptionContent() {
             
             {!plan.highlight ? (
               <TouchableOpacity 
-                style={[styles.subscribeButton, { backgroundColor: colors.primary }]}
+                style={[styles.subscribeButton, { backgroundColor: colors.accent }]}
                 onPress={() => handlePlanSelect(plan)}
               >
                 <Text style={styles.subscribeButtonText}>Subscribe</Text>
@@ -241,7 +248,7 @@ function SubscriptionContent() {
               
               <View style={styles.paymentModalBody}>
                 {selectedPlan && (
-                  <View style={[styles.planSummary, { backgroundColor: colors.card }]}>
+                  <View style={[styles.planSummary, { backgroundColor: colors.background }]}>
                     <Text style={[styles.planSummaryName, { color: colors.text }]}>{selectedPlan.name}</Text>
                     <Text style={[styles.planSummaryAmount, { color: colors.primary }]}>KSh {selectedPlan.amount}</Text>
                     <Text style={[styles.planSummaryPhone, { color: colors.textSecondary }]}>From: {userPhone}</Text>
@@ -300,13 +307,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  content: {
-    flex: 1,
+  fixedSection: {
+    paddingTop: 60,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    zIndex: 1000,
+    elevation: 5,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   },
   scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 12,
     paddingTop: 12,
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
   currentPlan: {
     padding: 20,

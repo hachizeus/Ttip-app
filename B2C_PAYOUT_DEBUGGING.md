@@ -21,8 +21,8 @@ B2C_SHORTCODE=600000
 
 ### **Optional (will use defaults):**
 ```
-B2C_TIMEOUT_URL=https://ttip-backend.onrender.com/api/b2c-timeout
-B2C_RESULT_URL=https://ttip-backend.onrender.com/api/b2c-callback
+B2C_TIMEOUT_URL=https://ttip-app.onrender.com/api/b2c-timeout
+B2C_RESULT_URL=https://ttip-app.onrender.com/api/b2c-callback
 ```
 
 ## 🧪 **Test After Adding Variables:**

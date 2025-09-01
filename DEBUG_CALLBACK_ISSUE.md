@@ -15,13 +15,13 @@
 ### 2. **Manual Completion Endpoint:**
 For testing, you can manually complete the payment:
 ```
-POST https://ttip-backend.onrender.com/api/complete-payment/ws_CO_310820250029123721475448
+POST https://ttip-app.onrender.com/api/complete-payment/ws_CO_310820250029123721475448
 ```
 
 ### 3. **Payment Status Debugging:**
 Check payment status:
 ```
-GET https://ttip-backend.onrender.com/api/payment-status/ws_CO_310820250029123721475448
+GET https://ttip-app.onrender.com/api/payment-status/ws_CO_310820250029123721475448
 ```
 
 ## 🧪 **Test Steps:**
@@ -33,7 +33,7 @@ GET https://ttip-backend.onrender.com/api/payment-status/ws_CO_31082025002912372
 4. **Check database** for tip records
 
 ### **Manual Test:**
-Visit: `https://ttip-backend.onrender.com/api/complete-payment/ws_CO_310820250029123721475448`
+Visit: `https://ttip-app.onrender.com/api/complete-payment/ws_CO_310820250029123721475448`
 
 This will manually mark the payment as completed and update worker stats.
 

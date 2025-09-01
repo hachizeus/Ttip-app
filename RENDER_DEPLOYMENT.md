@@ -36,12 +36,12 @@ INFOBIP_API_KEY=TLOqcDmWPfujtChtXlJBOZncdWdkcMbdLSUhzFLRgMJTSgUNZiaBIsQsHqzetv
 
 ### 4. **Get Render URL:**
 After deployment, you'll get a URL like:
-`https://ttip-backend.onrender.com`
+`https://ttip-app.onrender.com`
 
 ### 5. **Update App Configuration:**
 Update `.env` file:
 ```
-EXPO_PUBLIC_BACKEND_URL=https://ttip-backend.onrender.com
+EXPO_PUBLIC_BACKEND_URL=https://ttip-app.onrender.com
 ```
 
 **Your backend will be accessible from any device!** 🌐📱

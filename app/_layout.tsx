@@ -6,10 +6,10 @@ export default function RootLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: 'slide_from_right',
-        animationDuration: 300,
+        animation: 'fade_from_bottom',
+        animationDuration: 150,
         gestureEnabled: true,
-        gestureDirection: 'horizontal',
+        presentation: 'transparentModal',
       }}
     />
   );

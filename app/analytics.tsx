@@ -82,10 +82,13 @@ function AnalyticsContent() {
     const labels = []
     const data = []
     
-    // Create daily buckets
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date()
-      date.setDate(date.getDate() - i)
+    // Create daily buckets for current month
+    const startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
+    const endDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0)
+    const totalDays = endDate.getDate()
+    
+    for (let day = 1; day <= totalDays; day++) {
+      const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
       const dateStr = date.toISOString().split('T')[0]
       
       // Sum tips for this day
@@ -94,23 +97,23 @@ function AnalyticsContent() {
       )
       const dayTotal = dayTips.reduce((sum, tip) => sum + (parseFloat(tip.amount) || 0), 0)
       
-      // Format labels for days of month
-      labels.push(date.getDate().toString())
+      labels.push(day.toString())
       data.push(dayTotal)
     }
 
-    // Ensure we always have valid data
-    const validData = data.length > 0 && data.some(val => val > 0) ? data : [0]
-    const maxValue = Math.max(...validData)
-    
-    setChartData({
-      labels,
-      datasets: [{
-        data: validData,
-        color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
-        strokeWidth: 2
-      }]
-    })
+    // Only show chart if there's data
+    if (data.some(val => val > 0)) {
+      setChartData({
+        labels,
+        datasets: [{
+          data,
+          color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
+          strokeWidth: 2
+        }]
+      })
+    } else {
+      setChartData(null)
+    }
   }
 
   const getAmountRangeStats = () => {
@@ -162,8 +165,8 @@ function AnalyticsContent() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text>Loading analytics...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <Text style={{ color: colors.text }}>Loading analytics...</Text>
       </View>
     )
   }
@@ -172,6 +175,7 @@ function AnalyticsContent() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Fixed Top Section */}
       <View style={[styles.fixedSection, { backgroundColor: colors.background, marginTop: 60 }]}>
+
         {/* Total Amount Card */}
         <View style={[styles.totalCard, { backgroundColor: colors.card }]}>
           <Text style={[styles.totalLabel, { color: colors.textSecondary }]}>TOTAL EARNINGS</Text>
@@ -179,7 +183,7 @@ function AnalyticsContent() {
         </View>
 
         {/* Month Navigator */}
-        <View style={[styles.monthNavigator, { backgroundColor: colors.card }]}>
+        <View style={[styles.monthNavigator, { backgroundColor: colors.background }]}>
           <TouchableOpacity 
             style={styles.navButton}
             onPress={() => {
@@ -207,12 +211,12 @@ function AnalyticsContent() {
       </View>
 
       {/* Scrollable Content */}
-      <ScrollView style={styles.scrollableContent}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
 
         {/* Chart */}
-        {chartData && (
-          <View style={[styles.chartContainer, { backgroundColor: colors.card }]}>
-            <Text style={[styles.chartTitle, { color: colors.text }]}>Daily Earnings - {currentMonth.toLocaleDateString('en-US', { month: 'long' })}</Text>
+        <View style={[styles.chartContainer, { backgroundColor: colors.background }]}>
+          <Text style={[styles.chartTitle, { color: colors.text }]}>Daily Earnings - {currentMonth.toLocaleDateString('en-US', { month: 'long' })}</Text>
+          {chartData ? (
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
@@ -254,11 +258,16 @@ function AnalyticsContent() {
                 fromZero={true}
               />
             </ScrollView>
-          </View>
-        )}
+          ) : (
+            <View style={styles.noDataContainer}>
+              <MaterialIcons name="show-chart" size={48} color={colors.textSecondary} />
+              <Text style={[styles.noDataText, { color: colors.textSecondary }]}>No earnings data for this month</Text>
+            </View>
+          )}
+        </View>
 
         {/* Amount Range Statistics */}
-        <View style={[styles.rangeStatsContainer, { backgroundColor: colors.card }]}>
+        <View style={[styles.rangeStatsContainer, { backgroundColor: colors.background }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Tip Amount Breakdown</Text>
           {getAmountRangeStats().map((range, index) => (
             <View key={index} style={styles.rangeItem}>
@@ -273,12 +282,12 @@ function AnalyticsContent() {
 
         {/* Quick Stats Cards */}
         <View style={styles.statsGrid}>
-          <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.statCard, { backgroundColor: colors.background }]}>
             <MaterialIcons name="trending-up" size={24} color="#00C851" />
             <Text style={[styles.statValue, { color: colors.text }]}>{transactions.length}</Text>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total Tips</Text>
           </View>
-          <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.statCard, { backgroundColor: colors.background }]}>
             <MaterialIcons name="attach-money" size={24} color="#007AFF" />
             <Text style={[styles.statValue, { color: colors.text }]}>KSh {Math.round(totalAmount / Math.max(transactions.length, 1)).toLocaleString()}</Text>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Avg Tip</Text>
@@ -286,7 +295,7 @@ function AnalyticsContent() {
         </View>
 
         {/* Transactions History */}
-        <View style={[styles.transactionsSection, { backgroundColor: colors.card }]}>
+        <View style={[styles.transactionsSection, { backgroundColor: colors.background }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Transactions</Text>
           <FlatList
             data={transactions.slice(0, 10)}
@@ -315,8 +324,10 @@ const styles = StyleSheet.create({
     padding: 12,
     paddingBottom: 0,
   },
-  scrollableContent: {
-    flex: 1,
+
+  scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: 100,
   },
   totalCard: {
     padding: 16,
@@ -380,6 +391,15 @@ const styles = StyleSheet.create({
   },
   chart: {
     borderRadius: 16,
+  },
+  noDataContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  noDataText: {
+    fontSize: 16,
+    marginTop: 12,
+    textAlign: 'center',
   },
   chartScrollContent: {
     paddingHorizontal: 0,

@@ -48,7 +48,7 @@ PORT=3000
 ```
 
 ## Testing
-1. Check health endpoint: `https://ttip-backend.onrender.com/health`
+1. Check health endpoint: `https://ttip-app.onrender.com/health`
 2. Test frontend loads properly
 3. Verify M-Pesa integration works
 

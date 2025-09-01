@@ -4,7 +4,7 @@
 
 ### 1. **Wrong Callback URL:**
 - Was using: `https://cpbonffjhrckiiqbsopt.supabase.co/functions/v1/mpesa-callback`
-- Fixed to: `https://ttip-backend.onrender.com/api/callback`
+- Fixed to: `https://ttip-app.onrender.com/api/callback`
 
 ### 2. **Database Foreign Key Error:**
 - Worker ID `W12345678` doesn't exist in workers table
@@ -22,7 +22,7 @@
 - Allows tips to be saved properly
 
 ## 🧪 **Test After Deploy:**
-1. **Make new payment** at: https://ttip-backend.onrender.com/tip/W12345678
+1. **Make new payment** at: https://ttip-app.onrender.com/tip/W12345678
 2. **Check Render logs** for M-Pesa callback data
 3. **Payment should complete** and show success message
 4. **Worker should receive** B2C payout

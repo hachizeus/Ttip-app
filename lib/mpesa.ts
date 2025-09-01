@@ -1,6 +1,6 @@
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:3000'
 
-export const initiateMpesaPayment = async (phone: string, amount: number, workerID: string) => {
+export const initiateMpesaPayment = async (phone: string, amount: number, accountReference?: string) => {
   try {
     const response = await fetch(`${BACKEND_URL}/api/pay`, {
       method: 'POST',
@@ -10,7 +10,7 @@ export const initiateMpesaPayment = async (phone: string, amount: number, worker
       body: JSON.stringify({
         phone,
         amount,
-        accountReference: workerID
+        accountReference: accountReference || 'SUBSCRIPTION'
       }),
     })
     return await response.json()

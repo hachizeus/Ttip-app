@@ -1,7 +1,8 @@
 import { MaterialIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import React, { useEffect, useState } from 'react'
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native'
+import { BlurView } from 'expo-blur'
 import QRCode from 'react-native-qrcode-svg'
 import ModalOverlay from '../../components/ModalOverlay'
 import NotificationsModal from '../../components/NotificationsModal'
@@ -23,6 +24,7 @@ export default function HomeScreen() {
   const [workerID, setWorkerID] = useState('')
   const [totalTips, setTotalTips] = useState(0)
   const [tipCount, setTipCount] = useState(0)
+  const [profileImage, setProfileImage] = useState('')
 
   useEffect(() => {
     checkAuth()
@@ -51,7 +53,7 @@ export default function HomeScreen() {
       // Try to find worker data with proper error handling
       const { data: workerData, error } = await supabase
         .from('workers')
-        .select('name, worker_id, total_tips, tip_count, occupation')
+        .select('name, worker_id, total_tips, tip_count, occupation, profile_image_url')
         .eq('phone', phone)
         .maybeSingle()
       
@@ -66,6 +68,9 @@ export default function HomeScreen() {
         }
         if (workerData.worker_id) {
           setWorkerID(workerData.worker_id)
+        }
+        if (workerData.profile_image_url) {
+          setProfileImage(workerData.profile_image_url)
         }
         const newTotal = workerData.total_tips || 0
         const previousTotal = totalTips
@@ -87,12 +92,18 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Fixed Header */}
-      <View style={[styles.header, { backgroundColor: colors.background }]}>
+      {/* Fixed Header Only */}
+      <View style={[styles.fixedHeader, { backgroundColor: colors.background }]}>
         <View style={styles.headerLeft}>
-          <View style={[styles.profilePic, { backgroundColor: colors.border }]}>
-            <MaterialIcons name="person" size={24} color={colors.text} />
-          </View>
+          <TouchableOpacity onPress={() => router.push('/profile')}>
+            {profileImage ? (
+              <Image source={{ uri: profileImage }} style={styles.profilePic} />
+            ) : (
+              <View style={[styles.profilePic, { backgroundColor: colors.border }]}>
+                <MaterialIcons name="person" size={24} color={colors.text} />
+              </View>
+            )}
+          </TouchableOpacity>
           <View style={styles.greetingContainer}>
             <Text style={[styles.greeting, { color: colors.textSecondary }]}>Welcome to TTip,</Text>
             <Text style={[styles.userName, { color: colors.text }]}>{userName || 'User'} 👋</Text>
@@ -114,38 +125,39 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Fixed Earnings Card */}
-      <View style={[styles.balanceCard, { backgroundColor: colors.card }]}>
-        <View style={styles.cardHeader}>
-          <View style={styles.ttipBrand}>
-            <MaterialIcons name="account-balance-wallet" size={20} color={colors.primary} />
-            <Text style={[styles.brandText, { color: colors.text }]}>TTip Earnings</Text>
-          </View>
-        </View>
-        <Text style={[styles.balanceAmount, { color: colors.text }]}>KSh {totalTips.toLocaleString()}</Text>
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.primary }]}>{tipCount}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Tips</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.primary }]}>KSh {tipCount > 0 ? Math.round(totalTips / tipCount).toLocaleString() : '0'}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Avg</Text>
-          </View>
-        </View>
-      </View>
-      
-      {/* Spacer */}
-      <View style={styles.spacer} />
-
       {/* Scrollable Content */}
-      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContainer} 
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+      >
+        {/* Earnings Card */}
+        <View style={[styles.balanceCard, { backgroundColor: colors.card }]}>
+          <View style={styles.cardHeader}>
+            <View style={styles.ttipBrand}>
+              <MaterialIcons name="account-balance-wallet" size={20} color={colors.primary} />
+              <Text style={[styles.brandText, { color: colors.text }]}>TTip Earnings</Text>
+            </View>
+          </View>
+          <Text style={[styles.balanceAmount, { color: colors.text }]}>KSh {totalTips.toLocaleString()}</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.primary }]}>{tipCount}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Tips</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.primary }]}>KSh {tipCount > 0 ? Math.round(totalTips / tipCount).toLocaleString() : '0'}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Avg</Text>
+            </View>
+          </View>
+        </View>
 
 
 
       <View style={styles.quickActions}>
-        <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.card }]} onPress={() => setShowQR(true)}>
+        <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => setShowQR(true)}>
           <View style={[styles.actionIcon, { backgroundColor: colors.primary }]}>
             <MaterialIcons name="qr-code" size={28} color="#fff" />
           </View>
@@ -153,7 +165,7 @@ export default function HomeScreen() {
           <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Show to customers</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.card }]} onPress={() => router.push('/analytics')}>
+        <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => router.push('/analytics')}>
           <View style={[styles.actionIcon, { backgroundColor: colors.primary }]}>
             <MaterialIcons name="analytics" size={28} color="#fff" />
           </View>
@@ -163,16 +175,16 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.quickActions}>
-        <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.card }]} onPress={() => router.push('/scanner')}>
-          <View style={[styles.actionIcon, { backgroundColor: colors.primary }]}>
+        <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => router.push('/scanner')}>
+          <View style={[styles.actionIcon, { backgroundColor: colors.accent }]}>
             <MaterialIcons name="qr-code-scanner" size={28} color="#fff" />
           </View>
           <Text style={[styles.actionTitle, { color: colors.text }]}>Scan QR</Text>
           <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Scan to tip</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.card }]} onPress={() => router.push('/subscription')}>
-          <View style={[styles.actionIcon, { backgroundColor: colors.primary }]}>
+        <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => router.push('/subscription')}>
+          <View style={[styles.actionIcon, { backgroundColor: colors.accent }]}>
             <MaterialIcons name="diamond" size={28} color="#fff" />
           </View>
           <Text style={[styles.actionTitle, { color: colors.text }]}>Subscription</Text>
@@ -180,7 +192,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={[styles.infoSection, { backgroundColor: colors.card }]}>
+      <View style={[styles.infoSection, { backgroundColor: colors.background }]}>
         <Text style={[styles.infoTitle, { color: colors.text }]}>How TTip Works</Text>
         <View style={styles.infoItem}>
           <Text style={styles.infoEmoji}>1️⃣</Text>
@@ -201,39 +213,31 @@ export default function HomeScreen() {
       </View>
       
       <Modal visible={showQR} transparent animationType="fade">
-        <ModalOverlay visible={showQR}>
-          <View style={styles.qrModalContainer}>
-            <View style={[styles.qrModalContent, { backgroundColor: colors.background }]}>
-              <View style={[styles.qrModalHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.qrModalTitle, { color: colors.text }]}>My QR Code</Text>
-                <TouchableOpacity onPress={() => setShowQR(false)} style={styles.qrCloseButton}>
-                  <MaterialIcons name="close" size={24} color={colors.text} />
-                </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.qrModalContainer} 
+          activeOpacity={1} 
+          onPress={() => setShowQR(false)}
+        >
+          <BlurView intensity={60} tint="dark" style={styles.blurBackground} />
+          <View style={styles.qrCenterContainer}>
+            {workerID && (
+              <View style={[styles.qrCodeWrapper, { backgroundColor: '#ffffff' }]}>
+                <QRCode
+                  value={`${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-app.onrender.com'}/tip/${workerID}?ref=app&worker=${workerID}&timestamp=${Date.now()}`}
+                  size={200}
+                  backgroundColor="white"
+                  color="black"
+                  logo={require('../../assets/images/mylogo.png')}
+                  logoSize={50}
+                  logoBackgroundColor="white"
+                  logoMargin={4}
+                  logoBorderRadius={25}
+                  ecl="M"
+                />
               </View>
-              
-              <View style={styles.qrModalBody}>
-                <Text style={[styles.qrModalSubtitle, { color: colors.textSecondary }]}>Customers can scan this to tip you</Text>
-                
-                {workerID && (
-                  <View style={[styles.qrCodeWrapper, { backgroundColor: colors.card }]}>
-                    <QRCode
-                      value={`https://ttip-backend.onrender.com/tip/${workerID}`}
-                      size={180}
-                      backgroundColor="white"
-                      color="black"
-                      logo={require('../../assets/images/icon.png')}
-                      logoSize={30}
-                      logoBackgroundColor="white"
-                      logoMargin={2}
-                    />
-                  </View>
-                )}
-                
-                <Text style={[styles.qrWorkerID, { color: colors.textSecondary }]}>Worker ID: {workerID}</Text>
-              </View>
-            </View>
+            )}
           </View>
-        </ModalOverlay>
+        </TouchableOpacity>
       </Modal>
 
       <NotificationsModal
@@ -252,9 +256,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 20,
+  fixedHeader: {
+    paddingTop: 50,
+    paddingBottom: 10,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
@@ -263,8 +267,12 @@ const styles = StyleSheet.create({
     elevation: 5,
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   },
-  scrollContent: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: 100,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -284,7 +292,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -6,
     right: -6,
-    backgroundColor: '#FF3B30',
+    backgroundColor: '#FF6B00',
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -321,15 +329,10 @@ const styles = StyleSheet.create({
   },
   balanceCard: {
     margin: 16,
-    marginBottom: 0,
     padding: 16,
     borderRadius: 12,
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
     elevation: 3,
-    zIndex: 999,
-  },
-  spacer: {
-    height: 16,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -438,47 +441,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   qrModalContainer: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
   },
-  qrModalContent: {
-    width: '100%',
-    maxWidth: 320,
-    borderRadius: 16,
-    overflow: 'hidden',
+  blurBackground: {
+    ...StyleSheet.absoluteFillObject,
   },
-  qrModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  qrCenterContainer: {
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-  },
-  qrModalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  qrCloseButton: {
-    padding: 4,
-  },
-  qrModalBody: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  qrModalSubtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 24,
   },
   qrCodeWrapper: {
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  qrWorkerID: {
-    fontSize: 12,
-    textAlign: 'center',
+    padding: 24,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 })

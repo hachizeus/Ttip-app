@@ -23,10 +23,10 @@
 ## 🔧 **For Existing Deducted Payment:**
 
 ### **Check Transaction Status:**
-Visit: `https://ttip-backend.onrender.com/api/payment-status/[YOUR_CHECKOUT_ID]`
+Visit: `https://ttip-app.onrender.com/api/payment-status/[YOUR_CHECKOUT_ID]`
 
 ### **Manual Complete if Needed:**
-Visit: `https://ttip-backend.onrender.com/api/complete-payment/[YOUR_CHECKOUT_ID]`
+Visit: `https://ttip-app.onrender.com/api/complete-payment/[YOUR_CHECKOUT_ID]`
 
 ## 📱 **Root Cause:**
 M-Pesa sandbox can be slow, taking 1-2 minutes to send callbacks. The 60-second timeout was too aggressive.

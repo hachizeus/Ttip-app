@@ -4,11 +4,11 @@
     "slug": "ttip",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/mylogo.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/splash.png",
+      "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -19,7 +19,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/mylogo.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.elitjohns.ttip",
@@ -28,7 +28,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png",
+      "favicon": "./assets/images/mylogo.png",
       "build": {
         "babel": {
           "include": [
@@ -38,9 +38,7 @@
       }
     },
     "plugins": [
-      "expo-router",
-      "@react-native-firebase/app",
-      "@react-native-firebase/messaging"
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true

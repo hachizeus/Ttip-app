@@ -13,7 +13,7 @@ The `enhanced-daraja.mjs` file was trying to load `.env` file which doesn't exis
 - Wait for "Deploy successful" message
 
 ## 🧪 **Test After Deploy:**
-1. Visit: https://ttip-backend.onrender.com/tip/W12345678
+1. Visit: https://ttip-app.onrender.com/tip/W12345678
 2. Enter amount: 1
 3. Enter phone: 0721475448
 4. Click "Send STK Push"
