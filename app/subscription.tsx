@@ -76,7 +76,7 @@ function SubscriptionContent() {
   }
 
   const pollPaymentStatus = async (checkoutID: string) => {
-    const maxAttempts = 30 // Poll for 60 seconds (30 * 2 seconds)
+    const maxAttempts = 15 // Poll for 30 seconds (15 * 2 seconds)
     let attempts = 0
     
     const poll = async () => {
@@ -86,35 +86,35 @@ function SubscriptionContent() {
         
         const result = await response.json()
         
-        if (result.status === 'completed') {
+        if (result.status === 'success' || result.status === 'completed') {
           setPaymentStatusMessage('Payment successful! Your subscription has been updated.')
           loadSubscription()
           
           setTimeout(() => {
             setShowPaymentStatus(false)
             setPaymentStatusMessage('')
-          }, 3000)
+          }, 2000)
           
-        } else if (result.status === 'failed') {
-          setPaymentStatusMessage('Payment failed or was cancelled. Please try again.')
+        } else if (result.status === 'failed' || result.status === 'cancelled') {
+          setPaymentStatusMessage('Payment was cancelled or failed. Please try again.')
           
           setTimeout(() => {
             setShowPaymentStatus(false)
             setPaymentStatusMessage('')
-          }, 3000)
+          }, 2000)
           
         } else if (attempts < maxAttempts) {
-          // Still pending, continue polling
+          // Still pending, continue polling faster
           attempts++
-          setTimeout(poll, 2000)
+          setTimeout(poll, 1000) // Check every 1 second instead of 2
         } else {
-          // Timeout
-          setPaymentStatusMessage('Payment timeout. Please check your M-Pesa and try again if needed.')
+          // Timeout - assume cancelled
+          setPaymentStatusMessage('Payment timeout. Transaction may have been cancelled.')
           
           setTimeout(() => {
             setShowPaymentStatus(false)
             setPaymentStatusMessage('')
-          }, 3000)
+          }, 2000)
         }
       } catch (error) {
         setPaymentStatusMessage('Error checking payment status. Please try again.')
@@ -122,7 +122,7 @@ function SubscriptionContent() {
         setTimeout(() => {
           setShowPaymentStatus(false)
           setPaymentStatusMessage('')
-        }, 3000)
+        }, 2000)
       }
     }
     
@@ -300,14 +300,14 @@ function SubscriptionContent() {
       </Modal>
 
       <Modal visible={showPaymentStatus} transparent animationType="fade">
-        <ModalOverlay visible={showPaymentStatus}>
+        <View style={styles.statusModalBackdrop}>
           <View style={styles.statusModalContainer}>
             <View style={[styles.statusModalContent, { backgroundColor: colors.background }]}>
               <MaterialIcons name="payment" size={48} color={colors.primary} />
               <Text style={[styles.statusMessage, { color: colors.text }]}>{paymentStatusMessage}</Text>
             </View>
           </View>
-        </ModalOverlay>
+        </View>
       </Modal>
     </View>
   )
@@ -540,18 +540,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  statusModalContainer: {
+  statusModalBackdrop: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusModalContainer: {
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
   },
   statusModalContent: {
-    width: '100%',
-    maxWidth: 280,
+    width: 280,
     padding: 30,
     borderRadius: 16,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
   },
   statusMessage: {
     fontSize: 16,

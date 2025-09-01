@@ -2,7 +2,13 @@ import express, { json } from 'express';
 import cors from 'cors';
 import { configDotenv } from 'dotenv'
 import { initiateMpesaPayment, queryPaymentStatus } from './daraja.mjs';
+import { createClient } from '@supabase/supabase-js';
 configDotenv('./.env')
+
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY
+);
 
 const app = express();
 app.use(json());
@@ -116,23 +122,58 @@ app.get('/tip/:workerID', async (req, res) => {
     try {
         const { workerID } = req.params;
         
+        // Fetch worker from database
+        const { data: worker, error } = await supabase
+            .from('workers')
+            .select('name, occupation, worker_id')
+            .eq('worker_id', workerID)
+            .single();
+        
+        if (error || !worker) {
+            return res.status(404).send(`
+                <!DOCTYPE html>
+                <html>
+                    <head>
+                        <title>Worker Not Found</title>
+                        <meta name="viewport" content="width=device-width, initial-scale=1">
+                        <style>
+                            body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
+                            .container { max-width: 400px; margin: 0 auto; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <h1>Worker Not Found</h1>
+                            <p>The worker with ID ${workerID} does not exist.</p>
+                        </div>
+                    </body>
+                </html>
+            `);
+        }
+        
         res.send(`
             <!DOCTYPE html>
             <html>
                 <head>
-                    <title>Tip Worker</title>
+                    <title>Tip ${worker.name}</title>
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <style>
-                        body { font-family: Arial, sans-serif; padding: 20px; }
-                        .container { max-width: 400px; margin: 0 auto; }
-                        input, button { width: 100%; padding: 10px; margin: 10px 0; }
-                        button { background: #0052CC; color: white; border: none; border-radius: 5px; }
+                        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+                        .container { max-width: 400px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+                        .worker-info { text-align: center; margin-bottom: 20px; }
+                        .worker-name { font-size: 24px; font-weight: bold; color: #0052CC; }
+                        .worker-occupation { color: #666; margin: 5px 0; }
+                        input, button { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+                        button { background: #0052CC; color: white; border: none; cursor: pointer; }
+                        button:hover { background: #003d99; }
                     </style>
                 </head>
                 <body>
                     <div class="container">
-                        <h1>Send a Tip</h1>
-                        <p>Worker ID: ${workerID}</p>
+                        <div class="worker-info">
+                            <div class="worker-name">${worker.name}</div>
+                            <div class="worker-occupation">${worker.occupation}</div>
+                        </div>
                         <input type="number" id="amount" placeholder="Enter tip amount (KSh)" min="1">
                         <input type="tel" id="phone" placeholder="Your phone number (254...)">
                         <button onclick="sendTip()">Send Tip</button>
@@ -151,7 +192,11 @@ app.get('/tip/:workerID', async (req, res) => {
                                 const response = await fetch('/api/pay', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ phone, amount: parseInt(amount) })
+                                    body: JSON.stringify({ 
+                                        phone, 
+                                        amount: parseInt(amount),
+                                        workerID: '${workerID}'
+                                    })
                                 });
                                 
                                 const result = await response.json();
@@ -173,6 +218,23 @@ app.get('/tip/:workerID', async (req, res) => {
         res.status(500).send('Server error');
     }
 });
+
+// Auto-expire pending payments after 2 minutes
+setInterval(() => {
+    const now = new Date();
+    for (const [checkoutID, payment] of paymentRequests.entries()) {
+        if (payment.status === 'PENDING') {
+            const paymentTime = new Date(payment.timestamp);
+            const timeDiff = (now.getTime() - paymentTime.getTime()) / 1000;
+            
+            // Auto-expire after 2 minutes
+            if (timeDiff > 120) {
+                payment.status = 'FAILED';
+                paymentRequests.set(checkoutID, payment);
+            }
+        }
+    }
+}, 30000); // Check every 30 seconds
 
 // Callback endpoint for M-Pesa notifications
 app.post('/api/callback', (req, res) => {
