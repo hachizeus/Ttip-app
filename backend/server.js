@@ -569,6 +569,53 @@ app.get('/api/subscription-status/:checkoutRequestID', async (req, res) => {
     }
 });
 
+// Manual subscription update for completed payments
+app.post('/api/fix-subscription/:phone', async (req, res) => {
+    const { phone } = req.params;
+    
+    try {
+        // Check if there's a completed subscription payment for this phone
+        const { data: payment } = await supabase
+            .from('subscription_payments')
+            .select('*')
+            .eq('phone', phone)
+            .eq('status', 'completed')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+        
+        if (!payment) {
+            return res.json({ success: false, error: 'No completed subscription payment found' });
+        }
+        
+        // Update worker subscription
+        const expiryDate = new Date();
+        expiryDate.setMonth(expiryDate.getMonth() + 1);
+        
+        const { error: updateError } = await supabase
+            .from('workers')
+            .update({
+                subscription_plan: payment.plan,
+                subscription_expiry: expiryDate.toISOString()
+            })
+            .eq('phone', phone);
+        
+        if (updateError) {
+            return res.json({ success: false, error: updateError.message });
+        }
+        
+        res.json({ 
+            success: true, 
+            message: `Subscription updated to ${payment.plan} for ${phone}`,
+            plan: payment.plan,
+            expiry: expiryDate.toISOString()
+        });
+    } catch (error) {
+        console.error('Manual subscription fix error:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
 // Manual payment completion (for testing)
 app.post('/api/complete-payment/:checkoutRequestID', async (req, res) => {
     const { checkoutRequestID } = req.params;
