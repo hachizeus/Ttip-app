@@ -128,86 +128,66 @@ app.post('/api/callback', async (req, res) => {
                 console.log('Tip status updated to completed:', Body.stkCallback.CheckoutRequestID);
                 console.log('Update error:', error);
             } else {
-                // Create new record since it doesn't exist
-                console.log('Tip record not found, creating new one for:', Body.stkCallback.CheckoutRequestID);
-                const { error: insertError } = await supabase
-                    .from('tips')
-                    .insert({
-                        worker_id: 'WNRSVWHJQ', // Use correct worker ID from database
-                        amount: amount,
-                        customer_phone: phone,
-                        transaction_id: Body.stkCallback.CheckoutRequestID,
-                        status: 'completed',
-                        mpesa_receipt: receipt,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                    });
-                
-                if (insertError) {
-                    console.error('Failed to create tip record:', insertError);
-                } else {
-                    console.log('Tip record created successfully for:', Body.stkCallback.CheckoutRequestID);
-                }
+                // Skip creating new record without proper worker_id - this should come from the original tip request
+                console.log('Tip record not found, cannot create without proper worker_id from original request');
             }
             
-            if (!insertError) {
-                // Get worker details for payout
-                const { data: tip, error: tipError } = await supabase
-                    .from('tips')
-                    .select('worker_id, amount')
-                    .eq('transaction_id', Body.stkCallback.CheckoutRequestID)
+            // Get worker details for payout
+            const { data: tip, error: tipError } = await supabase
+                .from('tips')
+                .select('worker_id, amount')
+                .eq('transaction_id', Body.stkCallback.CheckoutRequestID)
+                .single();
+            
+            console.log('Tip lookup result:', { tip, tipError, transactionId: Body.stkCallback.CheckoutRequestID });
+            
+            if (tip) {
+                // Update worker statistics
+                const { error: updateError } = await supabase
+                    .rpc('increment_worker_tips', {
+                        worker_id_param: tip.worker_id,
+                        tip_amount: tip.amount
+                    });
+                
+                if (updateError) {
+                    console.error('Error updating worker stats:', updateError);
+                    // Fallback: manual update
+                    await supabase
+                        .from('workers')
+                        .update({
+                            total_tips: supabase.raw('total_tips + ?', [tip.amount]),
+                            tip_count: supabase.raw('tip_count + 1')
+                        })
+                        .eq('worker_id', tip.worker_id);
+                }
+                
+                const { data: worker } = await supabase
+                    .from('workers')
+                    .select('phone, name')
+                    .eq('worker_id', tip.worker_id)
                     .single();
                 
-                console.log('Tip lookup result:', { tip, tipError, transactionId: Body.stkCallback.CheckoutRequestID });
-                
-                if (tip) {
-                    // Update worker statistics
-                    const { error: updateError } = await supabase
-                        .rpc('increment_worker_tips', {
-                            worker_id_param: tip.worker_id,
-                            tip_amount: tip.amount
+                if (worker) {
+                    // Initiate B2C payout to worker
+                    try {
+                        console.log(`Attempting B2C payout: ${tip.amount} KSh to ${worker.phone}`);
+                        const b2cResponse = await initiateB2CPayment(
+                            worker.phone, 
+                            tip.amount, 
+                            `Tip payout for ${worker.name}`
+                        );
+                        console.log(`B2C payout response:`, b2cResponse);
+                    } catch (b2cError) {
+                        console.error('B2C payout failed:', {
+                            message: b2cError.message,
+                            response: b2cError.response?.data,
+                            stack: b2cError.stack
                         });
-                    
-                    if (updateError) {
-                        console.error('Error updating worker stats:', updateError);
-                        // Fallback: manual update
-                        await supabase
-                            .from('workers')
-                            .update({
-                                total_tips: supabase.raw('total_tips + ?', [tip.amount]),
-                                tip_count: supabase.raw('tip_count + 1')
-                            })
-                            .eq('worker_id', tip.worker_id);
                     }
                     
-                    const { data: worker } = await supabase
-                        .from('workers')
-                        .select('phone, name')
-                        .eq('worker_id', tip.worker_id)
-                        .single();
-                    
-                    if (worker) {
-                        // Initiate B2C payout to worker
-                        try {
-                            console.log(`Attempting B2C payout: ${tip.amount} KSh to ${worker.phone}`);
-                            const b2cResponse = await initiateB2CPayment(
-                                worker.phone, 
-                                tip.amount, 
-                                `Tip payout for ${worker.name}`
-                            );
-                            console.log(`B2C payout response:`, b2cResponse);
-                        } catch (b2cError) {
-                            console.error('B2C payout failed:', {
-                                message: b2cError.message,
-                                response: b2cError.response?.data,
-                                stack: b2cError.stack
-                            });
-                        }
-                        
-                        // Send SMS notification
-                        await sendTipNotification(worker.phone, tip.amount);
-                        console.log(`Tip completed: ${tip.amount} KSh for worker ${tip.worker_id}`);
-                    }
+                    // Send SMS notification
+                    await sendTipNotification(worker.phone, tip.amount);
+                    console.log(`Tip completed: ${tip.amount} KSh for worker ${tip.worker_id}`);
                 }
             }
         } else {
@@ -290,8 +270,19 @@ app.post('/api/verify-otp', (req, res) => {
 });
 
 // Web tip page
-app.get('/tip/:workerID', (req, res) => {
+app.get('/tip/:workerID', async (req, res) => {
     const { workerID } = req.params;
+    
+    // Get worker details for display
+    const { data: worker } = await supabase
+        .from('workers')
+        .select('name, occupation')
+        .eq('worker_id', workerID)
+        .single();
+    
+    const workerName = worker?.name || 'Worker';
+    const workerOccupation = worker?.occupation || 'Service Worker';
+    
     res.send(`
         <!DOCTYPE html>
         <html>
@@ -310,7 +301,7 @@ app.get('/tip/:workerID', (req, res) => {
         <body>
             <div class="container">
                 <h1>💰 Quick Tip</h1>
-                <p>Tip for: Cook</p>
+                <p>Tip for: ${workerName} (${workerOccupation})</p>
                 <input type="number" id="amount" placeholder="Enter tip amount (KSh)" />
                 <input type="tel" id="phone" placeholder="Your phone number (0712345678)" />
                 <button onclick="sendSTK()" id="payBtn">Send STK Push 📱</button>
@@ -340,7 +331,7 @@ app.get('/tip/:workerID', (req, res) => {
                         const response = await fetch('/api/web-tip', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ workerID: 'WNRSVWHJQ', amount: amount, phone: phone })
+                            body: JSON.stringify({ workerID: '${workerID}', amount: amount, phone: phone })
                         });
                         
                         const result = await response.json();
@@ -452,36 +443,6 @@ app.post('/api/web-tip', async (req, res) => {
                 success: false, 
                 error: 'Tip amount exceeds Lite plan limit of 500 KSh. Worker needs Pro plan for higher amounts.' 
             });
-        }
-        
-        // Check if worker exists, create if not
-        const { data: existingWorker, error: checkError } = await supabase
-            .from('workers')
-            .select('worker_id')
-            .eq('worker_id', workerID)
-            .single();
-        
-        if (!existingWorker) {
-            // Create worker record
-            const { error: createError } = await supabase
-                .from('workers')
-                .insert({
-                    worker_id: workerID,
-                    name: 'Test Worker',
-                    phone: '254700000000',
-                    gender: 'Male',
-                    occupation: 'Service Worker',
-                    subscription_plan: 'free',
-                    total_tips: 0,
-                    tip_count: 0,
-                    created_at: new Date().toISOString()
-                });
-            
-            if (createError) {
-                console.error('Worker creation error:', createError);
-            } else {
-                console.log('Created worker:', workerID);
-            }
         }
         
         // Initiate M-Pesa payment

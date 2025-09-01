@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons'
-import { router } from 'expo-router'
-import React, { useEffect, useState } from 'react'
+import { router, useFocusEffect } from 'expo-router'
+import React, { useEffect, useState, useCallback } from 'react'
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native'
 import { BlurView } from 'expo-blur'
 import QRCode from 'react-native-qrcode-svg'
@@ -26,9 +26,11 @@ export default function HomeScreen() {
   const [tipCount, setTipCount] = useState(0)
   const [profileImage, setProfileImage] = useState('')
 
-  useEffect(() => {
-    checkAuth()
-  }, [])
+  useFocusEffect(
+    useCallback(() => {
+      checkAuth()
+    }, [])
+  )
 
   const checkAuth = async () => {
     const loggedIn = await isLoggedIn()
@@ -50,12 +52,17 @@ export default function HomeScreen() {
     if (phone) {
       console.log('Fetching worker data for phone:', phone)
       
-      // Try to find worker data with proper error handling
+      // Try to find worker data with proper error handling and force refresh
       const { data: workerData, error } = await supabase
         .from('workers')
         .select('name, worker_id, total_tips, tip_count, occupation, profile_image_url')
         .eq('phone', phone)
         .maybeSingle()
+        
+      // Force refresh profile image if it exists
+      if (workerData?.profile_image_url) {
+        setProfileImage(workerData.profile_image_url + '?t=' + Date.now())
+      }
       
       console.log('Final worker data result:', { workerData, error })
       

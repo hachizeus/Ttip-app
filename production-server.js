@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { initiateMpesaPayment, initiateB2CPayment } from './enhanced-daraja.mjs';
 import { sendTipNotification, sendOTPSMS } from './sms.mjs';
 
-configDotenv('./.env');
+configDotenv({ path: './.env' });
 
 const app = express();
 app.use(json({ limit: '10mb' }));
@@ -130,27 +130,11 @@ app.post('/api/callback', async (req, res) => {
             } else {
                 // Create new record since it doesn't exist
                 console.log('Tip record not found, creating new one for:', Body.stkCallback.CheckoutRequestID);
-                const { error: insertError } = await supabase
-                    .from('tips')
-                    .insert({
-                        worker_id: 'WNRSVWHJQ', // Use correct worker ID from database
-                        amount: amount,
-                        customer_phone: phone,
-                        transaction_id: Body.stkCallback.CheckoutRequestID,
-                        status: 'completed',
-                        mpesa_receipt: receipt,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                    });
-                
-                if (insertError) {
-                    console.error('Failed to create tip record:', insertError);
-                } else {
-                    console.log('Tip record created successfully for:', Body.stkCallback.CheckoutRequestID);
-                }
+                // Skip creating new record without proper worker_id from original request
+                console.log('Cannot create tip record without proper worker_id from original request');
             }
             
-            if (!insertError) {
+            if (existingTip) {
                 // Get worker details for payout
                 const { data: tip, error: tipError } = await supabase
                     .from('tips')
@@ -290,8 +274,19 @@ app.post('/api/verify-otp', (req, res) => {
 });
 
 // Web tip page
-app.get('/tip/:workerID', (req, res) => {
+app.get('/tip/:workerID', async (req, res) => {
     const { workerID } = req.params;
+    
+    // Get worker details from database
+    const { data: worker } = await supabase
+        .from('workers')
+        .select('name, occupation')
+        .eq('worker_id', workerID)
+        .single();
+    
+    const workerName = worker?.name || 'Worker';
+    const workerOccupation = worker?.occupation || 'Service Worker';
+    
     res.send(`
         <!DOCTYPE html>
         <html>
@@ -310,7 +305,7 @@ app.get('/tip/:workerID', (req, res) => {
         <body>
             <div class="container">
                 <h1>💰 Quick Tip</h1>
-                <p>Tip for: Cook</p>
+                <p>Tip for: ${workerName} (${workerOccupation})</p>
                 <input type="number" id="amount" placeholder="Enter tip amount (KSh)" />
                 <input type="tel" id="phone" placeholder="Your phone number (0712345678)" />
                 <button onclick="sendSTK()" id="payBtn">Send STK Push 📱</button>
@@ -340,7 +335,7 @@ app.get('/tip/:workerID', (req, res) => {
                         const response = await fetch('/api/web-tip', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ workerID: 'WNRSVWHJQ', amount: amount, phone: phone })
+                            body: JSON.stringify({ workerID: '${workerID}', amount: amount, phone: phone })
                         });
                         
                         const result = await response.json();
