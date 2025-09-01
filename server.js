@@ -98,7 +98,7 @@ app.post('/api/subscription-payment', async (req, res) => {
     }
 });
 
-// Subscription status endpoint
+// Subscription status endpoint with M-Pesa query
 app.get('/api/subscription-status/:checkoutID', async (req, res) => {
     try {
         const { checkoutID } = req.params;
@@ -106,6 +106,22 @@ app.get('/api/subscription-status/:checkoutID', async (req, res) => {
         
         if (!paymentRequest) {
             return res.json({ status: 'not_found' });
+        }
+        
+        // If still pending, query M-Pesa directly
+        if (paymentRequest.status === 'PENDING') {
+            try {
+                const statusResponse = await queryPaymentStatus(checkoutID);
+                if (statusResponse.status === 'SUCCESS') {
+                    paymentRequest.status = 'SUCCESS';
+                    paymentRequests.set(checkoutID, paymentRequest);
+                } else if (statusResponse.status === 'FAILED') {
+                    paymentRequest.status = 'FAILED';
+                    paymentRequests.set(checkoutID, paymentRequest);
+                }
+            } catch (queryError) {
+                console.log('Query error:', queryError);
+            }
         }
         
         res.json({ status: paymentRequest.status.toLowerCase() });
@@ -122,12 +138,16 @@ app.get('/tip/:workerID', async (req, res) => {
     try {
         const { workerID } = req.params;
         
+        console.log('Looking for worker with ID:', workerID);
+        
         // Fetch worker from database
         const { data: worker, error } = await supabase
             .from('workers')
             .select('name, occupation, worker_id')
             .eq('worker_id', workerID)
             .single();
+        
+        console.log('Worker query result:', { worker, error });
         
         if (error || !worker) {
             return res.status(404).send(`
@@ -144,7 +164,8 @@ app.get('/tip/:workerID', async (req, res) => {
                     <body>
                         <div class="container">
                             <h1>Worker Not Found</h1>
-                            <p>The worker with ID ${workerID} does not exist.</p>
+                            <p>The worker with ID <strong>${workerID}</strong> does not exist in our database.</p>
+                            <p>Please ask the worker to generate a new QR code.</p>
                         </div>
                     </body>
                 </html>
@@ -238,16 +259,26 @@ setInterval(() => {
 
 // Callback endpoint for M-Pesa notifications
 app.post('/api/callback', (req, res) => {
-    const { CheckoutRequestID, ResultCode } = req.body.Body.stkCallback;
+    console.log('M-Pesa callback received:', JSON.stringify(req.body, null, 2));
     
-    const paymentRequest = paymentRequests.get(CheckoutRequestID);
-    if (paymentRequest) {
-        if (ResultCode === 0) {
-            paymentRequest.status = 'SUCCESS';
+    try {
+        const { CheckoutRequestID, ResultCode } = req.body.Body.stkCallback;
+        
+        const paymentRequest = paymentRequests.get(CheckoutRequestID);
+        if (paymentRequest) {
+            if (ResultCode === 0) {
+                paymentRequest.status = 'SUCCESS';
+                console.log(`Payment ${CheckoutRequestID} marked as SUCCESS`);
+            } else {
+                paymentRequest.status = 'FAILED';
+                console.log(`Payment ${CheckoutRequestID} marked as FAILED with code ${ResultCode}`);
+            }
+            paymentRequests.set(CheckoutRequestID, paymentRequest);
         } else {
-            paymentRequest.status = 'FAILED';
+            console.log(`Payment request ${CheckoutRequestID} not found in memory`);
         }
-        paymentRequests.set(CheckoutRequestID, paymentRequest);
+    } catch (error) {
+        console.error('Callback processing error:', error);
     }
     
     res.json({ ResultCode: 0, ResultDesc: 'Success' });
