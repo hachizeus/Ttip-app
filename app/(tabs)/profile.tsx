@@ -1,7 +1,7 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons'
 import { router, useFocusEffect } from 'expo-router'
 import React, { useCallback, useEffect, useState } from 'react'
-import { Image, RefreshControl, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native'
+import { Image, RefreshControl, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, Share, Alert, Clipboard } from 'react-native'
 import GlobalModal from '../../components/GlobalModal'
 import { FacebookIcon, InstagramIcon, TwitterIcon, WhatsAppIcon } from '../../components/SocialIcons'
 import { getCurrentUser, logout } from '../../lib/auth'
@@ -18,6 +18,7 @@ export default function ProfileScreen() {
   const [userProfile, setUserProfile] = useState<any>(null)
   const [subscriptionPlan, setSubscriptionPlan] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [workerID, setWorkerID] = useState('')
 
   useEffect(() => {
     loadUserData()
@@ -44,13 +45,31 @@ export default function ProfileScreen() {
       try {
         const { data: worker, error } = await supabase
           .from('workers')
-          .select('name, occupation, bio, profile_image_url, subscription_plan, subscription_expiry, created_at')
+          .select('name, occupation, bio, profile_image_url, subscription_plan, subscription_expiry, created_at, worker_id, referral_credits, total_referrals')
           .eq('phone', phone)
           .single()
         
         if (!error && worker) {
           setUserProfile(worker)
           setSubscriptionPlan(worker.subscription_plan || '')
+          
+          // Get worker ID for referral sharing
+          const { data: workerData } = await supabase
+            .from('workers')
+            .select('worker_id')
+            .eq('phone', phone)
+            .single()
+          
+          if (workerData) {
+            setWorkerID(workerData.worker_id)
+          }
+          
+          // Store referral stats
+          setUserProfile({
+            ...worker,
+            referral_credits: worker.referral_credits || 0,
+            total_referrals: worker.total_referrals || 0
+          })
           
           // Calculate subscription status like subscription page
           const now = new Date()
@@ -96,6 +115,37 @@ export default function ProfileScreen() {
     await logout()
     // Go to welcome page
     router.replace('/welcome')
+  }
+
+  const shareReferralLink = async () => {
+    if (!workerID) {
+      Alert.alert('Error', 'Worker ID not found')
+      return
+    }
+    
+    const referralLink = `https://ttip-app.onrender.com/join/${workerID}`
+    const message = `🎉 Join TTip and start earning digital tips!\n\n${userProfile?.name || 'I'} invited you to TTip - the easiest way to receive tips via M-Pesa.\n\n💰 Earn tips instantly\n⭐ Build your reputation\n🎁 Refer friends for rewards\n\nJoin now: ${referralLink}\n\nUse referral code: ${workerID}`
+    
+    try {
+      const result = await Share.share({
+        message: message,
+        url: referralLink,
+        title: 'Join TTip - Digital Tipping Made Easy'
+      })
+      
+      if (result.action === Share.sharedAction) {
+        // Optionally track successful shares
+        console.log('Referral link shared successfully')
+      }
+    } catch (error) {
+      // Fallback to clipboard
+      Clipboard.setString(referralLink)
+      Alert.alert(
+        'Link Copied!', 
+        'Referral link copied to clipboard. Share it with friends to earn commission-free tips!',
+        [{ text: 'OK' }]
+      )
+    }
   }
 
   return (
@@ -156,6 +206,23 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
+        
+        {userProfile && (
+          <View style={styles.referralStats}>
+            <View style={styles.referralItem}>
+              <MaterialIcons name="card-giftcard" size={16} color="#00C851" />
+              <Text style={[styles.referralText, { color: colors.text }]}>
+                {userProfile.referral_credits || 0} free tips earned
+              </Text>
+            </View>
+            <View style={styles.referralItem}>
+              <MaterialIcons name="people" size={16} color="#667eea" />
+              <Text style={[styles.referralText, { color: colors.text }]}>
+                {userProfile.total_referrals || 0} friends referred
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Scrollable Menu */}
@@ -196,6 +263,20 @@ export default function ProfileScreen() {
           <View style={styles.menuContent}>
             <Text style={[styles.menuText, { color: colors.text }]}>My Subscription</Text>
             <Text style={[styles.menuSubtext, { color: colors.textSecondary }]}>Manage your plan</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.menuItem, { backgroundColor: colors.background }]}
+          onPress={shareReferralLink}
+        >
+          <View style={[styles.menuIconContainer, { backgroundColor: '#00C851' }]}>
+            <MaterialIcons name="share" size={20} color="#fff" />
+          </View>
+          <View style={styles.menuContent}>
+            <Text style={[styles.menuText, { color: colors.text }]}>Refer Friends</Text>
+            <Text style={[styles.menuSubtext, { color: colors.textSecondary }]}>Earn commission-free tips</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
@@ -412,6 +493,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fonts.medium,
     fontWeight: fontWeights.medium,
+  },
+  referralStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  referralItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  referralText: {
+    fontSize: 12,
+    marginLeft: 6,
+    fontFamily: fonts.regular,
+    fontWeight: fontWeights.regular,
   },
   bio: {
     fontSize: 14,

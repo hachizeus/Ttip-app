@@ -3,6 +3,7 @@ import cors from 'cors';
 import { configDotenv } from 'dotenv'
 import { initiateMpesaPayment, queryPaymentStatus } from './daraja.mjs';
 import { createClient } from '@supabase/supabase-js';
+import { sendSMS } from './sms.mjs';
 configDotenv('./.env')
 
 const supabase = createClient(
@@ -17,8 +18,79 @@ app.use(cors());
 // In-memory storage for payment requests (use database in production)
 const paymentRequests = new Map();
 
+// Phase 2: Milestone thresholds
+const MILESTONES = {
+    FIRST_TIP: { threshold: 1, badge: '🎉 First Tip!' },
+    RISING_STAR: { threshold: 100, badge: '⭐ Rising Star' },
+    TIP_CHAMPION: { threshold: 500, badge: '🏆 Tip Champion' },
+    TIP_LEGEND: { threshold: 1000, badge: '👑 Tip Legend' }
+};
+
+// Phase 2: Auto-generate review after tip
+async function generateAutoReview(workerID, amount) {
+    const reviews = [
+        'Great service, very professional!',
+        'Excellent work, highly recommended!',
+        'Amazing service, will definitely tip again!',
+        'Outstanding performance, keep it up!',
+        'Fantastic service, very satisfied!'
+    ];
+    
+    const rating = amount >= 100 ? 5 : amount >= 50 ? 4 : 3;
+    const review = reviews[Math.floor(Math.random() * reviews.length)];
+    
+    await supabase.from('reviews').insert({
+        worker_id: workerID,
+        rating,
+        review_text: review,
+        is_auto_generated: true
+    });
+}
+
+// Phase 2: Check and award milestones
+async function checkMilestones(workerID) {
+    const { data: stats } = await supabase
+        .from('transactions')
+        .select('amount')
+        .eq('worker_id', workerID)
+        .eq('status', 'completed');
+    
+    const totalTips = stats?.reduce((sum, t) => sum + t.amount, 0) || 0;
+    
+    for (const [key, milestone] of Object.entries(MILESTONES)) {
+        if (totalTips >= milestone.threshold) {
+            const { data: existing } = await supabase
+                .from('milestones')
+                .select('id')
+                .eq('worker_id', workerID)
+                .eq('milestone_type', key)
+                .single();
+            
+            if (!existing) {
+                await supabase.from('milestones').insert({
+                    worker_id: workerID,
+                    milestone_type: key,
+                    badge_text: milestone.badge,
+                    achieved_at: new Date().toISOString()
+                });
+                
+                // Send milestone notification
+                const { data: worker } = await supabase
+                    .from('workers')
+                    .select('phone')
+                    .eq('worker_id', workerID)
+                    .single();
+                
+                if (worker?.phone) {
+                    await sendSMS(worker.phone, `🎉 Congratulations! You've earned: ${milestone.badge}`);
+                }
+            }
+        }
+    }
+}
+
 app.post('/api/pay', async (req, res) => {
-    const { phone, amount } = req.body;
+    const { phone, amount, workerID } = req.body;
 
     try {
         const response = await initiateMpesaPayment(phone, amount);
@@ -29,7 +101,17 @@ app.post('/api/pay', async (req, res) => {
                 status: 'PENDING',
                 phone,
                 amount,
+                workerID,
                 timestamp: new Date().toISOString()
+            });
+            
+            // Store in database
+            await supabase.from('transactions').insert({
+                checkout_request_id: response.CheckoutRequestID,
+                worker_id: workerID,
+                customer_phone: phone,
+                amount,
+                status: 'pending'
             });
         }
         
@@ -184,9 +266,15 @@ app.get('/tip/:workerID', async (req, res) => {
                         .worker-info { text-align: center; margin-bottom: 20px; }
                         .worker-name { font-size: 24px; font-weight: bold; color: #0052CC; }
                         .worker-occupation { color: #666; margin: 5px 0; }
-                        input, button { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+                        .rating-section { margin: 15px 0; text-align: center; }
+                        .stars { font-size: 24px; margin: 10px 0; }
+                        .star { cursor: pointer; color: #ddd; transition: color 0.2s; }
+                        .star.active { color: #ffd700; }
+                        input, textarea, button { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+                        textarea { resize: vertical; height: 80px; }
                         button { background: #0052CC; color: white; border: none; cursor: pointer; }
                         button:hover { background: #003d99; }
+                        .success-message { background: #d4edda; color: #155724; padding: 15px; border-radius: 5px; margin: 10px 0; display: none; }
                     </style>
                 </head>
                 <body>
@@ -197,20 +285,52 @@ app.get('/tip/:workerID', async (req, res) => {
                         </div>
                         <input type="number" id="amount" placeholder="Enter tip amount (KSh)" min="1">
                         <input type="tel" id="phone" placeholder="Your phone number (254...)">
-                        <button onclick="sendTip()">Send Tip</button>
+                        
+                        <div class="rating-section">
+                            <div>Rate this service:</div>
+                            <div class="stars" id="stars">
+                                <span class="star" data-rating="1">★</span>
+                                <span class="star" data-rating="2">★</span>
+                                <span class="star" data-rating="3">★</span>
+                                <span class="star" data-rating="4">★</span>
+                                <span class="star" data-rating="5">★</span>
+                            </div>
+                            <textarea id="review" placeholder="Leave a review (optional)"></textarea>
+                        </div>
+                        
+                        <button onclick="sendTip()">Send Tip & Review</button>
+                        <div class="success-message" id="successMessage"></div>
                     </div>
                     <script>
+                        let selectedRating = 0;
+                        
+                        // Star rating functionality
+                        document.querySelectorAll('.star').forEach(star => {
+                            star.addEventListener('click', function() {
+                                selectedRating = parseInt(this.dataset.rating);
+                                updateStars();
+                            });
+                        });
+                        
+                        function updateStars() {
+                            document.querySelectorAll('.star').forEach((star, index) => {
+                                star.classList.toggle('active', index < selectedRating);
+                            });
+                        }
+                        
                         async function sendTip() {
                             const amount = document.getElementById('amount').value;
                             const phone = document.getElementById('phone').value;
+                            const review = document.getElementById('review').value;
                             
                             if (!amount || !phone) {
-                                alert('Please fill all fields');
+                                alert('Please enter amount and phone number');
                                 return;
                             }
                             
                             try {
-                                const response = await fetch('/api/pay', {
+                                // Send payment
+                                const payResponse = await fetch('/api/pay', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ 
@@ -220,12 +340,28 @@ app.get('/tip/:workerID', async (req, res) => {
                                     })
                                 });
                                 
-                                const result = await response.json();
+                                const payResult = await payResponse.json();
                                 
-                                if (result.ResponseCode === '0') {
-                                    alert('Payment request sent! Check your phone.');
+                                if (payResult.ResponseCode === '0') {
+                                    // Send review if provided
+                                    if (selectedRating > 0 || review.trim()) {
+                                        await fetch('/api/reviews', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                workerID: '${workerID}',
+                                                rating: selectedRating || 5,
+                                                reviewText: review || 'Great service!',
+                                                customerPhone: phone
+                                            })
+                                        });
+                                    }
+                                    
+                                    document.getElementById('successMessage').innerHTML = 
+                                        '✅ Payment request sent! Check your phone.<br>Thank you for your review!';
+                                    document.getElementById('successMessage').style.display = 'block';
                                 } else {
-                                    alert('Payment failed: ' + result.ResponseDescription);
+                                    alert('Payment failed: ' + payResult.ResponseDescription);
                                 }
                             } catch (error) {
                                 alert('Error: ' + error.message);
@@ -257,8 +393,86 @@ setInterval(() => {
     }
 }, 30000); // Check every 30 seconds
 
+// Phase 2: Reviews endpoints
+app.post('/api/reviews', async (req, res) => {
+    const { workerID, rating, reviewText, customerPhone } = req.body;
+    
+    try {
+        await supabase.from('reviews').insert({
+            worker_id: workerID,
+            rating,
+            review_text: reviewText,
+            customer_phone: customerPhone,
+            is_auto_generated: false
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/reviews/:workerID', async (req, res) => {
+    try {
+        const { data: reviews } = await supabase
+            .from('reviews')
+            .select('*')
+            .eq('worker_id', req.params.workerID)
+            .order('created_at', { ascending: false });
+        
+        res.json(reviews || []);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Phase 2: Teams endpoints
+app.post('/api/teams', async (req, res) => {
+    const { teamName, managerPhone, workerPhones } = req.body;
+    
+    try {
+        const { data: team } = await supabase
+            .from('teams')
+            .insert({ team_name: teamName, manager_phone: managerPhone })
+            .select()
+            .single();
+        
+        // Send invites to workers
+        for (const phone of workerPhones) {
+            await sendSMS(phone, `You've been invited to join team "${teamName}". Reply YES to accept.`);
+        }
+        
+        res.json({ success: true, teamId: team.id });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/teams/:teamId/stats', async (req, res) => {
+    try {
+        const { data: members } = await supabase
+            .from('workers')
+            .select('worker_id')
+            .eq('team_id', req.params.teamId);
+        
+        const workerIds = members?.map(m => m.worker_id) || [];
+        
+        const { data: transactions } = await supabase
+            .from('transactions')
+            .select('amount')
+            .in('worker_id', workerIds)
+            .eq('status', 'completed');
+        
+        const totalTips = transactions?.reduce((sum, t) => sum + t.amount, 0) || 0;
+        
+        res.json({ totalTips, memberCount: workerIds.length });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Callback endpoint for M-Pesa notifications
-app.post('/api/callback', (req, res) => {
+app.post('/api/callback', async (req, res) => {
     console.log('M-Pesa callback received:', JSON.stringify(req.body, null, 2));
     
     try {
@@ -268,9 +482,28 @@ app.post('/api/callback', (req, res) => {
         if (paymentRequest) {
             if (ResultCode === 0) {
                 paymentRequest.status = 'SUCCESS';
+                
+                // Update database
+                await supabase
+                    .from('transactions')
+                    .update({ status: 'completed' })
+                    .eq('checkout_request_id', CheckoutRequestID);
+                
+                // Phase 2: Generate auto-review and check milestones
+                if (paymentRequest.workerID) {
+                    await generateAutoReview(paymentRequest.workerID, paymentRequest.amount);
+                    await checkMilestones(paymentRequest.workerID);
+                }
+                
                 console.log(`Payment ${CheckoutRequestID} marked as SUCCESS`);
             } else {
                 paymentRequest.status = 'FAILED';
+                
+                await supabase
+                    .from('transactions')
+                    .update({ status: 'failed' })
+                    .eq('checkout_request_id', CheckoutRequestID);
+                
                 console.log(`Payment ${CheckoutRequestID} marked as FAILED with code ${ResultCode}`);
             }
             paymentRequests.set(CheckoutRequestID, paymentRequest);

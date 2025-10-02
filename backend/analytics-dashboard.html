@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTip Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .stat-value { font-size: 32px; font-weight: bold; color: #333; margin-bottom: 5px; }
+        .stat-label { color: #666; font-size: 14px; }
+        .stat-change { font-size: 12px; margin-top: 5px; }
+        .positive { color: #00C851; }
+        .negative { color: #FF6B6B; }
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+        .chart-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .chart-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #333; }
+        .table-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .worker-select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 20px; }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .forecast-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .forecast-value { font-size: 28px; font-weight: bold; margin-bottom: 10px; }
+        .confidence { opacity: 0.8; font-size: 14px; }
+        @media (max-width: 768px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 TTip Analytics Dashboard</h1>
+        <p>Real-time insights and performance metrics</p>
+    </div>
+
+    <div class="container">
+        <select id="workerSelect" class="worker-select">
+            <option value="">Loading workers...</option>
+        </select>
+
+        <div id="loading" class="loading">
+            <p>Select a worker to view analytics...</p>
+        </div>
+
+        <div id="dashboard" style="display: none;">
+            <!-- Key Metrics -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalEarnings">KSh 0</div>
+                    <div class="stat-label">Total Earnings</div>
+                    <div class="stat-change positive" id="earningsChange">+0% from last month</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="conversionRate">0%</div>
+                    <div class="stat-label">Conversion Rate</div>
+                    <div class="stat-change" id="conversionChange">Payment success rate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="averageTip">KSh 0</div>
+                    <div class="stat-label">Average Tip</div>
+                    <div class="stat-change" id="tipChange">Per transaction</div>
+                </div>
+                <div class="stat-card forecast-card">
+                    <div class="forecast-value" id="forecastEarnings">KSh 0</div>
+                    <div class="stat-label">30-Day Forecast</div>
+                    <div class="confidence" id="forecastConfidence">85% confidence</div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-title">Peak Tipping Hours</div>
+                    <canvas id="hourlyChart" width="400" height="200"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Earnings Trend (30 Days)</div>
+                    <canvas id="earningsChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Top Customers -->
+            <div class="table-card">
+                <div class="chart-title">Top Customers</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Customer</th>
+                            <th>Total Tips</th>
+                            <th>Frequency</th>
+                            <th>Avg Amount</th>
+                            <th>Last Tip</th>
+                        </tr>
+                    </thead>
+                    <tbody id="customersTable">
+                        <tr><td colspan="5">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Performance Metrics -->
+            <div class="table-card">
+                <div class="chart-title">Recent Performance</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Earnings</th>
+                            <th>Tips Count</th>
+                            <th>Conversion</th>
+                            <th>Peak Hour</th>
+                        </tr>
+                    </thead>
+                    <tbody id="performanceTable">
+                        <tr><td colspan="5">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let hourlyChart, earningsChart;
+
+        document.getElementById('workerSelect').addEventListener('change', function() {
+            const workerId = this.value;
+            if (workerId) {
+                loadAnalytics(workerId);
+            } else {
+                document.getElementById('dashboard').style.display = 'none';
+                document.getElementById('loading').style.display = 'block';
+            }
+        });
+        
+        // Load workers on page load
+        window.addEventListener('load', function() {
+            loadWorkers();
+        });
+        
+        async function loadWorkers() {
+            console.log('Loading workers...');
+            try {
+                const response = await fetch('/api/workers');
+                console.log('Workers response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Workers data:', data);
+                
+                const select = document.getElementById('workerSelect');
+                select.innerHTML = '<option value="">Select Worker...</option>';
+                
+                if (data.workers && data.workers.length > 0) {
+                    console.log(`Found ${data.workers.length} workers`);
+                    data.workers.forEach(worker => {
+                        const option = document.createElement('option');
+                        option.value = worker.worker_id;
+                        option.textContent = `${worker.name} (${worker.worker_id})`;
+                        select.appendChild(option);
+                    });
+                    
+                    // Auto-select first worker
+                    select.selectedIndex = 1;
+                    console.log('Auto-selecting worker:', select.value);
+                    loadAnalytics(select.value);
+                } else {
+                    console.log('No workers found in response');
+                    select.innerHTML = '<option value="">No workers found</option>';
+                }
+            } catch (error) {
+                console.error('Error loading workers:', error);
+                document.getElementById('workerSelect').innerHTML = `<option value="">Error: ${error.message}</option>`;
+            }
+        }
+
+        async function loadAnalytics(workerId) {
+            console.log('Loading analytics for worker:', workerId);
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('loading').innerHTML = '<p>Loading analytics data...</p>';
+
+            try {
+                // Load analytics data
+                console.log('Fetching analytics...');
+                const analyticsResponse = await fetch(`/api/analytics/${workerId}?period=30`);
+                
+                if (!analyticsResponse.ok) {
+                    throw new Error(`Analytics API returned ${analyticsResponse.status}`);
+                }
+                
+                const analyticsData = await analyticsResponse.json();
+                console.log('Analytics data:', analyticsData);
+
+                // Load forecast data
+                console.log('Fetching forecast...');
+                const forecastResponse = await fetch(`/api/forecast/${workerId}?days=30`);
+                
+                if (!forecastResponse.ok) {
+                    console.warn('Forecast API failed, using empty data');
+                }
+                
+                const forecastData = forecastResponse.ok ? await forecastResponse.json() : { forecast: [] };
+                console.log('Forecast data:', forecastData);
+
+                // Update dashboard
+                updateDashboard(analyticsData, forecastData);
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+
+            } catch (error) {
+                console.error('Error loading analytics:', error);
+                document.getElementById('loading').innerHTML = `<p>Error loading analytics: ${error.message}</p>`;
+            }
+        }
+
+        function updateDashboard(analytics, forecast) {
+            console.log('Updating dashboard with:', analytics, forecast);
+            
+            // Update key metrics
+            const totalEarnings = analytics.analytics?.total_tips || 0;
+            document.getElementById('totalEarnings').textContent = `KSh ${totalEarnings.toLocaleString()}`;
+            
+            const conversionRate = analytics.analytics?.conversion_rate || 0;
+            document.getElementById('conversionRate').textContent = `${conversionRate.toFixed(1)}%`;
+            
+            const avgTip = analytics.performance?.length > 0 
+                ? analytics.performance.reduce((sum, p) => sum + parseFloat(p.average_tip || 0), 0) / analytics.performance.length
+                : 0;
+            document.getElementById('averageTip').textContent = `KSh ${avgTip.toFixed(0)}`;
+
+            // Update forecast
+            const forecastTotal = forecast.forecast?.reduce((sum, f) => sum + f.predicted_earnings, 0) || 0;
+            document.getElementById('forecastEarnings').textContent = `KSh ${forecastTotal.toLocaleString()}`;
+            
+            const avgConfidence = forecast.forecast?.length > 0
+                ? forecast.forecast.reduce((sum, f) => sum + f.confidence_level, 0) / forecast.forecast.length
+                : 85; // Default confidence
+            document.getElementById('forecastConfidence').textContent = `${avgConfidence.toFixed(0)}% confidence`;
+
+            // Update earnings change
+            document.getElementById('earningsChange').textContent = 'Ready for tips!';
+            document.getElementById('conversionChange').textContent = 'Start receiving payments';
+            document.getElementById('tipChange').textContent = 'Per successful transaction';
+
+            // Update charts
+            updateHourlyChart(analytics.hourlyDistribution || {});
+            updateEarningsChart(analytics.performance || []);
+
+            // Update tables
+            updateCustomersTable(analytics.topCustomers || []);
+            updatePerformanceTable(analytics.performance || []);
+        }
+
+        function updateHourlyChart(hourlyData) {
+            const ctx = document.getElementById('hourlyChart').getContext('2d');
+            
+            if (hourlyChart) {
+                hourlyChart.destroy();
+            }
+
+            const hours = Array.from({length: 24}, (_, i) => i);
+            const data = hours.map(hour => hourlyData[hour] || 0);
+
+            hourlyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: hours.map(h => `${h}:00`),
+                    datasets: [{
+                        label: 'Tips Received',
+                        data: data,
+                        backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        function updateEarningsChart(performanceData) {
+            const ctx = document.getElementById('earningsChart').getContext('2d');
+            
+            if (earningsChart) {
+                earningsChart.destroy();
+            }
+
+            const sortedData = performanceData.sort((a, b) => new Date(a.date) - new Date(b.date));
+            const labels = sortedData.map(p => new Date(p.date).toLocaleDateString());
+            const earnings = sortedData.map(p => parseFloat(p.total_earnings) || 0);
+
+            earningsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Daily Earnings',
+                        data: earnings,
+                        borderColor: 'rgba(118, 75, 162, 1)',
+                        backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'KSh ' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        function updateCustomersTable(customers) {
+            const tbody = document.getElementById('customersTable');
+            
+            if (customers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5">No customer data available</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = customers.map(customer => `
+                <tr>
+                    <td>${customer.customer_phone?.replace(/(\d{3})(\d{3})(\d{3})(\d{3})/, '$1***$4') || 'Unknown'}</td>
+                    <td>KSh ${parseFloat(customer.total_tips_given || 0).toLocaleString()}</td>
+                    <td>${customer.tip_frequency || 0} tips</td>
+                    <td>KSh ${parseFloat(customer.average_tip_amount || 0).toFixed(0)}</td>
+                    <td>${customer.last_tip_date ? new Date(customer.last_tip_date).toLocaleDateString() : 'Never'}</td>
+                </tr>
+            `).join('');
+        }
+
+        function updatePerformanceTable(performance) {
+            const tbody = document.getElementById('performanceTable');
+            
+            if (performance.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5">No performance data available</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = performance.slice(0, 10).map(perf => `
+                <tr>
+                    <td>${new Date(perf.date).toLocaleDateString()}</td>
+                    <td>KSh ${parseFloat(perf.total_earnings || 0).toLocaleString()}</td>
+                    <td>${perf.successful_payments || 0}</td>
+                    <td>${parseFloat(perf.conversion_rate || 0).toFixed(1)}%</td>
+                    <td>${perf.peak_hour || 12}:00</td>
+                </tr>
+            `).join('');
+        }
+
+        // Auto-refresh every 5 minutes
+        setInterval(() => {
+            const workerId = document.getElementById('workerSelect').value;
+            if (workerId) {
+                loadAnalytics(workerId);
+            }
+        }, 5 * 60 * 1000);
+    </script>
+</body>
+</html>

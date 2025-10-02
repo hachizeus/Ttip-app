@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
 -- Fraud detection tables
 CREATE TABLE IF NOT EXISTS fraud_checks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    worker_id TEXT,
+    worker_id UUID,
     customer_phone TEXT,
     customer_email TEXT,
     amount DECIMAL(10,2),
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS fraud_blacklist (
 -- USSD and offline payment tables
 CREATE TABLE IF NOT EXISTS ussd_qr_codes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    worker_id TEXT REFERENCES workers(id),
+    worker_id UUID REFERENCES workers(id),
     qr_type TEXT NOT NULL, -- 'ussd', 'paybill', 'offline', 'standard'
     qr_url TEXT,
     qr_svg TEXT,
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS ussd_qr_codes (
 CREATE TABLE IF NOT EXISTS ussd_mappings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     mpesa_code TEXT UNIQUE NOT NULL,
-    worker_id TEXT REFERENCES workers(id),
+    worker_id UUID REFERENCES workers(id),
     amount DECIMAL(10,2),
     phone_number TEXT,
     reconciled BOOLEAN DEFAULT false,
@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS system_alerts (
 CREATE TABLE IF NOT EXISTS transaction_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     transaction_id UUID REFERENCES transactions(id),
-    worker_id TEXT,
+    worker_id UUID,
     amount DECIMAL(10,2),
     gateway TEXT,
     status TEXT,

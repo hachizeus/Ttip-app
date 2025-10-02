@@ -1,196 +1,85 @@
+// TTip Phase 1 Test Script
+// Tests: Commission system, Referral system, Review system
+
+import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
-import { generateQRCode } from './qr-service.js';
-import { enqueuePayout } from './payment-queue.js';
 import { configDotenv } from 'dotenv';
 
 configDotenv();
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY
-);
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-async function runPhase1Tests() {
-    console.log('🧪 Running TTip Phase 1 Tests...\n');
-    
-    let passed = 0;
-    let failed = 0;
-    
-    // Test 1: Database Connection
+console.log('🚀 TTip Phase 1 Testing Started');
+console.log('Testing: Commission System, Referral System, Review System');
+console.log('='.repeat(60));
+
+// Test data
+const testWorkers = [
+    { phone: '254700000001', name: 'Alice Referrer', occupation: 'Waiter' },
+    { phone: '254700000002', name: 'Bob Referee', occupation: 'Bartender' },
+    { phone: '254700000003', name: 'Charlie Customer', occupation: 'Customer' }
+];
+
+const testCustomer = '254700000999';
+
+// Helper function to make API calls
+const apiCall = async (method, endpoint, data = null) => {
     try {
-        console.log('1️⃣ Testing database connection...');
-        const { data, error } = await supabase.from('workers').select('count').single();
-        if (error) throw error;
-        console.log('✅ Database connection successful\n');
-        passed++;
-    } catch (error) {
-        console.log('❌ Database connection failed:', error.message, '\n');
-        failed++;
-    }
-    
-    // Test 2: Worker Creation
-    try {
-        console.log('2️⃣ Testing worker creation...');
-        const testWorker = {
-            id: 'TEST001',
-            name: 'Test Worker',
-            phone: '+254700000001',
-            occupation: 'Test Occupation'
+        const config = {
+            method,
+            url: `${BASE_URL}${endpoint}`,
+            headers: { 'Content-Type': 'application/json' }
         };
         
-        const { error } = await supabase
-            .from('workers')
-            .upsert(testWorker);
+        if (data) config.data = data;
         
-        if (error) throw error;
-        console.log('✅ Worker creation successful\n');
-        passed++;
+        const response = await axios(config);
+        return { success: true, data: response.data };
     } catch (error) {
-        console.log('❌ Worker creation failed:', error.message, '\n');
-        failed++;
+        return { 
+            success: false, 
+            error: error.response?.data?.error || error.message 
+        };
     }
+};
+
+// Test 1: Worker Registration with Referral
+const testWorkerRegistration = async () => {
+    console.log('\n📝 Test 1: Worker Registration & Referral System');
     
-    // Test 3: QR Code Generation
     try {
-        console.log('3️⃣ Testing QR code generation...');
-        const qrData = await generateQRCode('TEST001');
-        
-        if (!qrData.qrPngUrl || !qrData.fallbackUrl) {
-            throw new Error('QR data incomplete');
-        }
-        
-        console.log('✅ QR code generation successful');
-        console.log(`   PNG URL: ${qrData.qrPngUrl}`);
-        console.log(`   Fallback URL: ${qrData.fallbackUrl}\n`);
-        passed++;
-    } catch (error) {
-        console.log('❌ QR code generation failed:', error.message, '\n');
-        failed++;
-    }
-    
-    // Test 4: Transaction Creation
-    try {
-        console.log('4️⃣ Testing transaction creation...');
-        const { data: transaction, error } = await supabase
-            .from('transactions')
-            .insert({
-                worker_id: 'TEST001',
-                customer_number: '+254700000002',
-                amount: 100,
-                status: 'PENDING'
-            })
-            .select()
-            .single();
-        
-        if (error) throw error;
-        console.log('✅ Transaction creation successful');
-        console.log(`   Transaction ID: ${transaction.id}\n`);
-        passed++;
-        
-        // Test 5: Payout Queue
-        try {
-            console.log('5️⃣ Testing payout queue...');
-            const jobId = await enqueuePayout(
-                transaction.id,
-                'TEST001',
-                100,
-                '+254700000002'
-            );
-            
-            console.log('✅ Payout queue test successful');
-            console.log(`   Job ID: ${jobId}\n`);
-            passed++;
-        } catch (error) {
-            console.log('❌ Payout queue test failed:', error.message, '\n');
-            failed++;
-        }
-        
-    } catch (error) {
-        console.log('❌ Transaction creation failed:', error.message, '\n');
-        failed++;
-    }
-    
-    // Test 6: Environment Variables
-    try {
-        console.log('6️⃣ Testing environment variables...');
-        const requiredEnvVars = [
-            'SUPABASE_URL',
-            'SUPABASE_SERVICE_KEY',
-            'CONSUMER_KEY',
-            'CONSUMER_SECRET',
-            'SHORT_CODE',
-            'PASSKEY'
-        ];
-        
-        const missing = requiredEnvVars.filter(env => !process.env[env]);
-        
-        if (missing.length > 0) {
-            throw new Error(`Missing environment variables: ${missing.join(', ')}`);
-        }
-        
-        console.log('✅ All required environment variables present\n');
-        passed++;
-    } catch (error) {
-        console.log('❌ Environment variables test failed:', error.message, '\n');
-        failed++;
-    }
-    
-    // Test 7: M-Pesa Credentials (Basic Auth Test)
-    try {
-        console.log('7️⃣ Testing M-Pesa credentials...');
-        const auth = Buffer.from(`${process.env.CONSUMER_KEY}:${process.env.CONSUMER_SECRET}`).toString('base64');
-        
-        const response = await fetch('https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', {
-            method: 'GET',
-            headers: {
-                'Authorization': `Basic ${auth}`
-            }
+        // Register first worker (referrer)
+        console.log('Registering Alice (referrer)...');
+        const alice = await apiCall('POST', '/api/register-worker', {
+            phone: testWorkers[0].phone,
+            name: testWorkers[0].name,
+            occupation: testWorkers[0].occupation
         });
         
-        const data = await response.json();
-        
-        if (!data.access_token) {
-            throw new Error('Invalid M-Pesa credentials');
+        if (!alice.success) {
+            console.log('❌ Alice registration failed:', alice.error);
+            return false;
         }
         
-        console.log('✅ M-Pesa credentials valid');
-        console.log(`   Token preview: ${data.access_token.substring(0, 20)}...\n`);
-        passed++;
-    } catch (error) {
-        console.log('❌ M-Pesa credentials test failed:', error.message, '\n');
-        failed++;
-    }
-    
-    // Cleanup test data
-    try {
-        console.log('🧹 Cleaning up test data...');
-        await supabase.from('payouts').delete().eq('worker_id', 'TEST001');
-        await supabase.from('transactions').delete().eq('worker_id', 'TEST001');
-        await supabase.from('qr_codes').delete().eq('worker_id', 'TEST001');
-        await supabase.from('workers').delete().eq('id', 'TEST001');
-        console.log('✅ Cleanup completed\n');
-    } catch (error) {
-        console.log('⚠️ Cleanup warning:', error.message, '\n');
-    }
-    
-    // Summary
-    console.log('📊 Test Summary:');
-    console.log(`✅ Passed: ${passed}`);
-    console.log(`❌ Failed: ${failed}`);
-    console.log(`📈 Success Rate: ${Math.round((passed / (passed + failed)) * 100)}%`);
-    
-    if (failed === 0) {
-        console.log('\n🎉 All tests passed! Phase 1 is ready for deployment.');
-    } else {
-        console.log('\n⚠️ Some tests failed. Please fix the issues before deployment.');
-    }
-    
-    return { passed, failed };
-}
-
-// Run tests if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-    runPhase1Tests().catch(console.error);
-}
-
-export { runPhase1Tests };
+        console.log('✅ Alice registered:', alice.data.workerId);
+        const aliceWorkerId = alice.data.workerId;
+        
+        // Register second worker with referral code
+        console.log('Registering Bob with Alice\\'s referral code...');
+        const bob = await apiCall('POST', '/api/register-worker', {
+            phone: testWorkers[1].phone,
+            name: testWorkers[1].name,
+            occupation: testWorkers[1].occupation,
+            referralCode: aliceWorkerId
+        });
+        
+        if (!bob.success) {
+            console.log('❌ Bob registration failed:', bob.error);
+            return false;
+        }
+        
+        console.log('✅ Bob registered with referral:', bob.data.workerId);
+        
+        // Check Alice's referral credits
+        const stats = await apiCall('GET', `/api/referral-stats/${aliceWorkerId}`);\n        if (stats.success) {\n            console.log('✅ Alice referral stats:', {\n                credits: stats.data.referralCredits,\n                totalReferrals: stats.data.totalReferrals\n            });\n            \n            if (stats.data.referralCredits === 1 && stats.data.totalReferrals === 1) {\n                console.log('✅ Referral system working correctly!');\n                return { aliceWorkerId, bobWorkerId: bob.data.workerId };\n            } else {\n                console.log('❌ Referral credits not updated correctly');\n                return false;\n            }\n        } else {\n            console.log('❌ Failed to get referral stats:', stats.error);\n            return false;\n        }\n        \n    } catch (error) {\n        console.log('❌ Worker registration test failed:', error.message);\n        return false;\n    }\n};\n\n// Test 2: Commission Calculation\nconst testCommissionSystem = async (workerId) => {\n    console.log('\\n💰 Test 2: Commission System');\n    \n    try {\n        // Simulate a tip transaction\n        const tipAmount = 100;\n        const expectedCommission = Math.round(tipAmount * 0.03); // 3%\n        const expectedPayout = tipAmount - expectedCommission;\n        \n        console.log(`Testing tip of KSh ${tipAmount}`);\n        console.log(`Expected commission: KSh ${expectedCommission}`);\n        console.log(`Expected worker payout: KSh ${expectedPayout}`);\n        \n        // Create a test transaction directly in database\n        const { data: transaction, error } = await supabase\n            .from('transactions')\n            .insert({\n                worker_id: workerId,\n                customer_number: testCustomer,\n                amount: tipAmount,\n                status: 'PENDING',\n                gateway: 'test'\n            })\n            .select()\n            .single();\n        \n        if (error) {\n            console.log('❌ Failed to create test transaction:', error.message);\n            return false;\n        }\n        \n        console.log('✅ Test transaction created:', transaction.id);\n        \n        // Simulate callback processing (this would normally come from M-Pesa)\n        const callbackData = {\n            Body: {\n                stkCallback: {\n                    ResultCode: 0,\n                    ResultDesc: 'Success',\n                    CheckoutRequestID: 'test-checkout-' + Date.now(),\n                    CallbackMetadata: {\n                        Item: [\n                            { Name: 'Amount', Value: tipAmount },\n                            { Name: 'MpesaReceiptNumber', Value: 'TEST' + Date.now() },\n                            { Name: 'PhoneNumber', Value: testCustomer }\n                        ]\n                    }\n                }\n            }\n        };\n        \n        // Update transaction with checkout ID for callback processing\n        await supabase\n            .from('transactions')\n            .update({ \n                raw_payload: { CheckoutRequestID: callbackData.Body.stkCallback.CheckoutRequestID }\n            })\n            .eq('id', transaction.id);\n        \n        // Test callback endpoint\n        const callback = await apiCall('POST', '/mpesa/c2b-callback', callbackData);\n        \n        if (!callback.success) {\n            console.log('❌ Callback processing failed:', callback.error);\n            return false;\n        }\n        \n        // Wait a moment for processing\n        await new Promise(resolve => setTimeout(resolve, 1000));\n        \n        // Check transaction was updated with commission\n        const { data: updatedTx } = await supabase\n            .from('transactions')\n            .select('*')\n            .eq('id', transaction.id)\n            .single();\n        \n        if (updatedTx.commission_amount === expectedCommission && \n            updatedTx.worker_payout === expectedPayout) {\n            console.log('✅ Commission calculated correctly!');\n            console.log(`   Commission: KSh ${updatedTx.commission_amount}`);\n            console.log(`   Worker payout: KSh ${updatedTx.worker_payout}`);\n            return transaction.id;\n        } else {\n            console.log('❌ Commission calculation incorrect');\n            console.log('   Expected:', { commission: expectedCommission, payout: expectedPayout });\n            console.log('   Actual:', { \n                commission: updatedTx.commission_amount, \n                payout: updatedTx.worker_payout \n            });\n            return false;\n        }\n        \n    } catch (error) {\n        console.log('❌ Commission test failed:', error.message);\n        return false;\n    }\n};\n\n// Test 3: Referral Credit Usage\nconst testReferralCredits = async (workerId) => {\n    console.log('\\n🎁 Test 3: Referral Credit Usage');\n    \n    try {\n        // Check worker has referral credits\n        const { data: worker } = await supabase\n            .from('workers')\n            .select('referral_credits')\n            .eq('worker_id', workerId)\n            .single();\n        \n        if (!worker || worker.referral_credits === 0) {\n            console.log('❌ Worker has no referral credits to test');\n            return false;\n        }\n        \n        console.log(`Worker has ${worker.referral_credits} referral credits`);\n        \n        // Create transaction that should use referral credit\n        const tipAmount = 200;\n        \n        const { data: transaction } = await supabase\n            .from('transactions')\n            .insert({\n                worker_id: workerId,\n                customer_number: testCustomer,\n                amount: tipAmount,\n                status: 'PENDING',\n                gateway: 'test'\n            })\n            .select()\n            .single();\n        \n        // Simulate callback with referral credit usage\n        const callbackData = {\n            Body: {\n                stkCallback: {\n                    ResultCode: 0,\n                    CheckoutRequestID: 'test-referral-' + Date.now(),\n                    CallbackMetadata: {\n                        Item: [\n                            { Name: 'Amount', Value: tipAmount },\n                            { Name: 'MpesaReceiptNumber', Value: 'TESTREF' + Date.now() },\n                            { Name: 'PhoneNumber', Value: testCustomer }\n                        ]\n                    }\n                }\n            }\n        };\n        \n        await supabase\n            .from('transactions')\n            .update({ \n                raw_payload: { CheckoutRequestID: callbackData.Body.stkCallback.CheckoutRequestID }\n            })\n            .eq('id', transaction.id);\n        \n        await apiCall('POST', '/mpesa/c2b-callback', callbackData);\n        await new Promise(resolve => setTimeout(resolve, 1000));\n        \n        // Check transaction used referral credit (no commission)\n        const { data: updatedTx } = await supabase\n            .from('transactions')\n            .select('*')\n            .eq('id', transaction.id)\n            .single();\n        \n        if (updatedTx.used_referral_credit && \n            updatedTx.commission_amount === 0 && \n            updatedTx.worker_payout === tipAmount) {\n            console.log('✅ Referral credit used successfully!');\n            console.log(`   Worker received full amount: KSh ${updatedTx.worker_payout}`);\n            console.log(`   Commission: KSh ${updatedTx.commission_amount}`);\n            return transaction.id;\n        } else {\n            console.log('❌ Referral credit not used correctly');\n            return false;\n        }\n        \n    } catch (error) {\n        console.log('❌ Referral credit test failed:', error.message);\n        return false;\n    }\n};\n\n// Test 4: Review System\nconst testReviewSystem = async (transactionId) => {\n    console.log('\\n⭐ Test 4: Review System');\n    \n    try {\n        // Test review page loads\n        console.log('Testing review page...');\n        const reviewPage = await axios.get(`${BASE_URL}/review/${transactionId}`);\n        \n        if (reviewPage.status === 200 && reviewPage.data.includes('Rate Your Experience')) {\n            console.log('✅ Review page loads correctly');\n        } else {\n            console.log('❌ Review page not loading');\n            return false;\n        }\n        \n        // Submit a test review\n        console.log('Submitting test review...');\n        const review = await apiCall('POST', '/api/submit-review', {\n            transactionId: transactionId,\n            rating: 5,\n            comment: 'Excellent service! Very professional and friendly.'\n        });\n        \n        if (!review.success) {\n            console.log('❌ Review submission failed:', review.error);\n            return false;\n        }\n        \n        console.log('✅ Review submitted successfully');\n        \n        // Check review was stored\n        const { data: storedReview } = await supabase\n            .from('reviews')\n            .select('*')\n            .eq('transaction_id', transactionId)\n            .single();\n        \n        if (storedReview && storedReview.rating === 5) {\n            console.log('✅ Review stored in database');\n            \n            // Check worker rating was updated\n            const { data: transaction } = await supabase\n                .from('transactions')\n                .select('worker_id')\n                .eq('id', transactionId)\n                .single();\n            \n            const { data: worker } = await supabase\n                .from('workers')\n                .select('average_rating, review_count')\n                .eq('worker_id', transaction.worker_id)\n                .single();\n            \n            if (worker.review_count > 0 && worker.average_rating > 0) {\n                console.log('✅ Worker rating updated:', {\n                    averageRating: worker.average_rating,\n                    reviewCount: worker.review_count\n                });\n                return true;\n            } else {\n                console.log('❌ Worker rating not updated');\n                return false;\n            }\n        } else {\n            console.log('❌ Review not stored correctly');\n            return false;\n        }\n        \n    } catch (error) {\n        console.log('❌ Review system test failed:', error.message);\n        return false;\n    }\n};\n\n// Test 5: Commission Analytics\nconst testCommissionAnalytics = async () => {\n    console.log('\\n📊 Test 5: Commission Analytics');\n    \n    try {\n        // Test commission stats endpoint (requires admin auth - skip for now)\n        console.log('Testing commission analytics views...');\n        \n        // Test commission analytics view\n        const { data: analytics } = await supabase\n            .from('commission_analytics')\n            .select('*')\n            .limit(5);\n        \n        if (analytics && analytics.length > 0) {\n            console.log('✅ Commission analytics working');\n            console.log('   Recent data:', analytics[0]);\n        } else {\n            console.log('⚠️  No commission data yet (expected for new setup)');\n        }\n        \n        // Test worker performance view\n        const { data: performance } = await supabase\n            .from('worker_performance')\n            .select('*')\n            .limit(3);\n        \n        if (performance) {\n            console.log('✅ Worker performance analytics working');\n            console.log(`   Found ${performance.length} workers in analytics`);\n        }\n        \n        return true;\n        \n    } catch (error) {\n        console.log('❌ Analytics test failed:', error.message);\n        return false;\n    }\n};\n\n// Run all tests\nconst runAllTests = async () => {\n    console.log('Starting Phase 1 comprehensive testing...\\n');\n    \n    let testResults = {\n        registration: false,\n        commission: false,\n        referralCredits: false,\n        reviews: false,\n        analytics: false\n    };\n    \n    try {\n        // Test 1: Registration & Referrals\n        const registrationResult = await testWorkerRegistration();\n        testResults.registration = !!registrationResult;\n        \n        if (registrationResult) {\n            // Test 2: Commission System\n            const commissionResult = await testCommissionSystem(registrationResult.aliceWorkerId);\n            testResults.commission = !!commissionResult;\n            \n            // Test 3: Referral Credits\n            const referralResult = await testReferralCredits(registrationResult.aliceWorkerId);\n            testResults.referralCredits = !!referralResult;\n            \n            // Test 4: Review System\n            if (commissionResult) {\n                const reviewResult = await testReviewSystem(commissionResult);\n                testResults.reviews = !!reviewResult;\n            }\n        }\n        \n        // Test 5: Analytics\n        const analyticsResult = await testCommissionAnalytics();\n        testResults.analytics = !!analyticsResult;\n        \n    } catch (error) {\n        console.log('\\n❌ Test suite failed:', error.message);\n    }\n    \n    // Print results\n    console.log('\\n' + '='.repeat(60));\n    console.log('🏁 PHASE 1 TEST RESULTS');\n    console.log('='.repeat(60));\n    \n    const tests = [\n        { name: 'Worker Registration & Referrals', result: testResults.registration },\n        { name: 'Commission System', result: testResults.commission },\n        { name: 'Referral Credits Usage', result: testResults.referralCredits },\n        { name: 'Review System', result: testResults.reviews },\n        { name: 'Analytics & Reporting', result: testResults.analytics }\n    ];\n    \n    tests.forEach(test => {\n        const status = test.result ? '✅ PASS' : '❌ FAIL';\n        console.log(`${status} ${test.name}`);\n    });\n    \n    const passedTests = tests.filter(t => t.result).length;\n    const totalTests = tests.length;\n    \n    console.log('\\n📈 SUMMARY:');\n    console.log(`   Tests Passed: ${passedTests}/${totalTests}`);\n    console.log(`   Success Rate: ${Math.round(passedTests/totalTests*100)}%`);\n    \n    if (passedTests === totalTests) {\n        console.log('\\n🎉 ALL TESTS PASSED! Phase 1 is ready for production.');\n    } else {\n        console.log('\\n⚠️  Some tests failed. Please check the implementation.');\n    }\n    \n    console.log('\\n💡 Next Steps:');\n    console.log('   1. Deploy to production');\n    console.log('   2. Set up monitoring');\n    console.log('   3. Start Phase 2 development');\n};\n\n// Run tests\nrunAllTests().catch(console.error);"

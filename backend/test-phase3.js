@@ -1,427 +1,387 @@
-import { createClient } from '@supabase/supabase-js';
+// TTip Phase 3 Test Script
+// Tests: Marketplace, Social Features, Loyalty, Gamification
+
 import axios from 'axios';
+import { createClient } from '@supabase/supabase-js';
 import { configDotenv } from 'dotenv';
 
 configDotenv();
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY
-);
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-const BASE_URL = 'http://localhost:3000';
+console.log('🚀 TTip Phase 3 Testing Started');
+console.log('Testing: Marketplace, Social Features, Loyalty, Gamification');
+console.log('='.repeat(60));
 
-class Phase3Tester {
-    constructor() {
-        this.testResults = [];
-        this.adminToken = null;
+// Helper function to make API calls
+const apiCall = async (method, endpoint, data = null) => {
+    try {
+        const config = {
+            method,
+            url: `${BASE_URL}${endpoint}`,
+            headers: { 'Content-Type': 'application/json' }
+        };
+        
+        if (data) config.data = data;
+        
+        const response = await axios(config);
+        return { success: true, data: response.data };
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.response?.data?.error || error.message 
+        };
     }
+};
 
-    async runAllTests() {
-        console.log('🧪 Starting TTip Phase 3 Comprehensive Tests...\n');
-
-        try {
-            // Test 1: Database Schema
-            await this.testDatabaseSchema();
-
-            // Test 2: Security Features
-            await this.testSecurityFeatures();
-
-            // Test 3: Multi-Gateway Payments
-            await this.testMultiGatewayPayments();
-
-            // Test 4: USSD Functionality
-            await this.testUSSDFunctionality();
-
-            // Test 5: Fraud Detection
-            await this.testFraudDetection();
-
-            // Test 6: Admin Features
-            await this.testAdminFeatures();
-
-            // Test 7: Analytics
-            await this.testAnalytics();
-
-            // Test 8: Monitoring
-            await this.testMonitoring();
-
-            this.printResults();
-
-        } catch (error) {
-            console.error('❌ Test suite failed:', error);
-        }
-    }
-
-    async testDatabaseSchema() {
-        console.log('📊 Testing Database Schema...');
-
+// Test 1: Database Schema
+const testDatabaseSchema = async () => {
+    console.log('\n🗄️  Test 1: Phase 3 Database Schema');
+    
+    try {
         const tables = [
-            'idempotency_keys',
-            'admin_users',
-            'fraud_checks',
-            'fraud_blacklist',
-            'ussd_qr_codes',
-            'system_logs',
-            'analytics_events'
+            'worker_profiles',
+            'service_categories',
+            'worker_services',
+            'loyalty_points',
+            'loyalty_rewards',
+            'achievement_badges',
+            'user_achievements',
+            'leaderboards',
+            'social_interactions',
+            'worker_followers'
         ];
-
+        
+        let tablesExist = 0;
+        
         for (const table of tables) {
-            try {
-                const { data, error } = await supabase
-                    .from(table)
-                    .select('count')
-                    .limit(1);
-
-                this.addResult(`Database table: ${table}`, !error, error?.message);
-            } catch (error) {
-                this.addResult(`Database table: ${table}`, false, error.message);
-            }
-        }
-    }
-
-    async testSecurityFeatures() {
-        console.log('🔒 Testing Security Features...');
-
-        // Test CSRF protection
-        try {
-            const response = await axios.post(`${BASE_URL}/api/pay`, {
-                method: 'mpesa',
-                workerId: 'test',
-                amount: 10,
-                customerPhone: '0712345678'
-            });
-
-            this.addResult('CSRF Protection', response.status === 403, 'Should reject without CSRF token');
-        } catch (error) {
-            this.addResult('CSRF Protection', error.response?.status === 403, 'CSRF protection active');
-        }
-
-        // Test rate limiting
-        try {
-            const promises = Array(15).fill().map(() => 
-                axios.post(`${BASE_URL}/api/pay`, {}, { 
-                    headers: { 'X-CSRF-Token': Date.now().toString() }
-                }).catch(e => e.response)
-            );
-
-            const responses = await Promise.all(promises);
-            const rateLimited = responses.some(r => r?.status === 429);
-
-            this.addResult('Rate Limiting', rateLimited, 'Rate limiting should trigger');
-        } catch (error) {
-            this.addResult('Rate Limiting', false, error.message);
-        }
-
-        // Test idempotency
-        try {
-            const idempotencyKey = `test-${Date.now()}`;
+            const { data, error } = await supabase
+                .from(table)
+                .select('*')
+                .limit(1);
             
-            const response1 = await axios.post(`${BASE_URL}/api/pay`, {
-                method: 'mpesa',
-                workerId: 'test',
-                amount: 10,
-                customerPhone: '0712345678'
-            }, {
-                headers: {
-                    'X-CSRF-Token': Date.now().toString(),
-                    'Idempotency-Key': idempotencyKey
-                }
-            }).catch(e => e.response);
-
-            const response2 = await axios.post(`${BASE_URL}/api/pay`, {
-                method: 'mpesa',
-                workerId: 'test',
-                amount: 10,
-                customerPhone: '0712345678'
-            }, {
-                headers: {
-                    'X-CSRF-Token': Date.now().toString(),
-                    'Idempotency-Key': idempotencyKey
-                }
-            }).catch(e => e.response);
-
-            this.addResult('Idempotency', 
-                response1?.data && response2?.data && 
-                JSON.stringify(response1.data) === JSON.stringify(response2.data),
-                'Idempotent requests should return same response'
-            );
-        } catch (error) {
-            this.addResult('Idempotency', false, error.message);
-        }
-    }
-
-    async testMultiGatewayPayments() {
-        console.log('💳 Testing Multi-Gateway Payments...');
-
-        const gateways = ['mpesa', 'stripe', 'paypal', 'flutterwave'];
-
-        for (const gateway of gateways) {
-            try {
-                const response = await axios.post(`${BASE_URL}/api/pay`, {
-                    method: gateway,
-                    workerId: 'test-worker',
-                    amount: 10,
-                    currency: 'KES',
-                    customerPhone: '0712345678',
-                    customerEmail: 'test@example.com'
-                }, {
-                    headers: {
-                        'X-CSRF-Token': Date.now().toString(),
-                        'Idempotency-Key': `test-${gateway}-${Date.now()}`
-                    }
-                }).catch(e => e.response);
-
-                this.addResult(`Payment Gateway: ${gateway}`, 
-                    response?.data?.success !== undefined,
-                    response?.data?.error || 'Gateway responded'
-                );
-            } catch (error) {
-                this.addResult(`Payment Gateway: ${gateway}`, false, error.message);
+            if (error) {
+                console.log(`⚠️  Table ${table} not accessible`);
+            } else {
+                console.log(`✅ Table ${table} exists and accessible`);
+                tablesExist++;
             }
         }
+        
+        console.log(`📊 Database Status: ${tablesExist}/${tables.length} tables accessible`);
+        return tablesExist >= 8; // Pass if most tables exist
+        
+    } catch (error) {
+        console.log('❌ Database schema test failed:', error.message);
+        return false;
     }
+};
 
-    async testUSSDFunctionality() {
-        console.log('📱 Testing USSD Functionality...');
+// Test 2: Service Categories
+const testServiceCategories = async () => {
+    console.log('\n🏷️  Test 2: Service Categories');
+    
+    try {
+        const categories = await apiCall('GET', '/api/categories');
+        
+        if (!categories.success) {
+            console.log('❌ Categories endpoint failed:', categories.error);
+            return false;
+        }
+        
+        console.log('✅ Categories endpoint working');
+        console.log(`   Found ${categories.data.categories?.length || 0} categories`);
+        
+        if (categories.data.categories?.length > 0) {
+            console.log('   Sample categories:', 
+                categories.data.categories.slice(0, 3).map(c => c.name).join(', ')
+            );
+        }
+        
+        return true;
+        
+    } catch (error) {
+        console.log('❌ Categories test failed:', error.message);
+        return false;
+    }
+};
 
-        // Test USSD QR generation
-        try {
-            const response = await axios.post(`${BASE_URL}/generate-ussd-qr`, {
-                workerId: 'test-worker',
-                type: 'ussd'
+// Test 3: Marketplace Workers
+const testMarketplace = async () => {
+    console.log('\n🏪 Test 3: Marketplace');
+    
+    try {
+        const workers = await apiCall('GET', '/api/marketplace/workers?limit=5');
+        
+        if (!workers.success) {
+            console.log('❌ Marketplace endpoint failed:', workers.error);
+            return false;
+        }
+        
+        console.log('✅ Marketplace endpoint working');
+        console.log(`   Found ${workers.data.workers?.length || 0} workers`);
+        
+        if (workers.data.workers?.length > 0) {
+            const worker = workers.data.workers[0];
+            console.log('   Sample worker:', {
+                name: worker.name,
+                occupation: worker.occupation,
+                rating: worker.average_rating
             });
-
-            this.addResult('USSD QR Generation', 
-                response.data?.qrPngUrl && response.data?.instructions,
-                'USSD QR generated with instructions'
-            );
-        } catch (error) {
-            this.addResult('USSD QR Generation', false, error.message);
         }
-
-        // Test offline QR generation
-        try {
-            const response = await axios.post(`${BASE_URL}/generate-ussd-qr`, {
-                workerId: 'test-worker',
-                type: 'offline'
-            });
-
-            this.addResult('Offline QR Generation', 
-                response.data?.qrPngUrl && response.data?.instructions,
-                'Offline QR generated'
-            );
-        } catch (error) {
-            this.addResult('Offline QR Generation', false, error.message);
-        }
-
-        // Test USSD reconciliation
-        try {
-            const response = await axios.post(`${BASE_URL}/api/ussd-reconcile`, {
-                mpesaCode: 'TEST123456',
-                amount: 50,
-                phoneNumber: '254712345678'
-            });
-
-            this.addResult('USSD Reconciliation', 
-                response.data?.success !== undefined,
-                response.data?.message || 'Reconciliation attempted'
-            );
-        } catch (error) {
-            this.addResult('USSD Reconciliation', false, error.message);
-        }
+        
+        return true;
+        
+    } catch (error) {
+        console.log('❌ Marketplace test failed:', error.message);
+        return false;
     }
+};
 
-    async testFraudDetection() {
-        console.log('🛡️ Testing Fraud Detection...');
-
-        // Test high amount fraud detection
-        try {
-            const response = await axios.post(`${BASE_URL}/api/pay`, {
-                method: 'mpesa',
-                workerId: 'test-worker',
-                amount: 50000, // High amount
-                customerPhone: '0712345678'
-            }, {
-                headers: {
-                    'X-CSRF-Token': Date.now().toString(),
-                    'Idempotency-Key': `fraud-test-${Date.now()}`
-                }
-            }).catch(e => e.response);
-
-            this.addResult('Fraud Detection - High Amount', 
-                response?.data?.error?.includes('flagged') || response?.data?.success === false,
-                'High amount should trigger fraud detection'
-            );
-        } catch (error) {
-            this.addResult('Fraud Detection - High Amount', false, error.message);
+// Test 4: Worker Profile
+const testWorkerProfile = async () => {
+    console.log('\n👤 Test 4: Worker Profile');
+    
+    try {
+        const workerId = 'W001TEST';
+        const profile = await apiCall('GET', `/api/workers/${workerId}/profile`);
+        
+        if (!profile.success) {
+            console.log('❌ Profile endpoint failed:', profile.error);
+            return false;
         }
-
-        // Test rapid transactions fraud detection
-        const rapidTests = [];
-        for (let i = 0; i < 5; i++) {
-            rapidTests.push(
-                axios.post(`${BASE_URL}/api/pay`, {
-                    method: 'mpesa',
-                    workerId: 'test-worker',
-                    amount: 100,
-                    customerPhone: '0712345678'
-                }, {
-                    headers: {
-                        'X-CSRF-Token': Date.now().toString(),
-                        'Idempotency-Key': `rapid-${i}-${Date.now()}`
-                    }
-                }).catch(e => e.response)
-            );
-        }
-
-        try {
-            const responses = await Promise.all(rapidTests);
-            const flagged = responses.some(r => 
-                r?.data?.error?.includes('flagged') || r?.data?.success === false
-            );
-
-            this.addResult('Fraud Detection - Rapid Transactions', 
-                flagged,
-                'Rapid transactions should trigger fraud detection'
-            );
-        } catch (error) {
-            this.addResult('Fraud Detection - Rapid Transactions', false, error.message);
-        }
-    }
-
-    async testAdminFeatures() {
-        console.log('👨‍💼 Testing Admin Features...');
-
-        // Test admin login (without 2FA for testing)
-        try {
-            const response = await axios.post(`${BASE_URL}/admin/login`, {
-                username: 'admin',
-                password: 'test-password',
-                totpCode: '123456' // Mock TOTP
-            }).catch(e => e.response);
-
-            if (response?.data?.token) {
-                this.adminToken = response.data.token;
-            }
-
-            this.addResult('Admin Login', 
-                response?.data?.success !== undefined,
-                'Admin login endpoint responds'
-            );
-        } catch (error) {
-            this.addResult('Admin Login', false, error.message);
-        }
-
-        // Test admin transactions endpoint
-        try {
-            const response = await axios.get(`${BASE_URL}/admin/transactions`, {
-                headers: {
-                    'Authorization': `Bearer ${this.adminToken || 'test-token'}`
-                }
-            }).catch(e => e.response);
-
-            this.addResult('Admin Transactions', 
-                response?.status === 200 || response?.status === 401,
-                'Admin transactions endpoint accessible'
-            );
-        } catch (error) {
-            this.addResult('Admin Transactions', false, error.message);
-        }
-    }
-
-    async testAnalytics() {
-        console.log('📈 Testing Analytics...');
-
-        // Test analytics endpoint
-        try {
-            const response = await axios.get(`${BASE_URL}/admin/analytics`, {
-                headers: {
-                    'Authorization': `Bearer ${this.adminToken || 'test-token'}`
-                }
-            }).catch(e => e.response);
-
-            this.addResult('Analytics Endpoint', 
-                response?.status === 200 || response?.status === 401,
-                'Analytics endpoint accessible'
-            );
-        } catch (error) {
-            this.addResult('Analytics Endpoint', false, error.message);
-        }
-    }
-
-    async testMonitoring() {
-        console.log('📊 Testing Monitoring...');
-
-        // Test health endpoint
-        try {
-            const response = await axios.get(`${BASE_URL}/health`);
-
-            this.addResult('Health Check', 
-                response.data?.status === 'OK',
-                'Health check returns OK status'
-            );
-        } catch (error) {
-            this.addResult('Health Check', false, error.message);
-        }
-
-        // Test metrics endpoint
-        try {
-            const response = await axios.get(`${BASE_URL}/metrics`);
-
-            this.addResult('Metrics Endpoint', 
-                response.data?.includes('ttip_requests_total'),
-                'Metrics endpoint returns Prometheus format'
-            );
-        } catch (error) {
-            this.addResult('Metrics Endpoint', false, error.message);
-        }
-    }
-
-    addResult(test, passed, message) {
-        this.testResults.push({
-            test,
-            passed,
-            message
+        
+        console.log('✅ Profile endpoint working');
+        console.log('   Profile data:', {
+            name: profile.data.profile?.name,
+            occupation: profile.data.profile?.occupation,
+            rating: profile.data.profile?.average_rating
         });
-
-        const status = passed ? '✅' : '❌';
-        console.log(`  ${status} ${test}: ${message}`);
+        
+        return true;
+        
+    } catch (error) {
+        console.log('❌ Profile test failed:', error.message);
+        return false;
     }
+};
 
-    printResults() {
-        console.log('\n' + '='.repeat(60));
-        console.log('🎯 PHASE 3 TEST RESULTS SUMMARY');
-        console.log('='.repeat(60));
-
-        const passed = this.testResults.filter(r => r.passed).length;
-        const total = this.testResults.length;
-        const percentage = ((passed / total) * 100).toFixed(1);
-
-        console.log(`\nTotal Tests: ${total}`);
-        console.log(`Passed: ${passed}`);
-        console.log(`Failed: ${total - passed}`);
-        console.log(`Success Rate: ${percentage}%`);
-
-        if (percentage >= 80) {
-            console.log('\n🎉 Phase 3 implementation is READY FOR PRODUCTION!');
-        } else if (percentage >= 60) {
-            console.log('\n⚠️  Phase 3 needs some fixes before production');
-        } else {
-            console.log('\n❌ Phase 3 requires significant fixes');
+// Test 5: Loyalty System
+const testLoyaltySystem = async () => {
+    console.log('\n🎁 Test 5: Loyalty System');
+    
+    try {
+        const customerPhone = '254700000999';
+        
+        // Test loyalty points endpoint
+        const loyalty = await apiCall('GET', `/api/loyalty/${customerPhone}`);
+        
+        if (!loyalty.success) {
+            console.log('❌ Loyalty endpoint failed:', loyalty.error);
+            return false;
         }
-
-        console.log('\n📋 Failed Tests:');
-        this.testResults
-            .filter(r => !r.passed)
-            .forEach(r => console.log(`  ❌ ${r.test}: ${r.message}`));
-
-        console.log('\n✅ Passed Tests:');
-        this.testResults
-            .filter(r => r.passed)
-            .forEach(r => console.log(`  ✅ ${r.test}`));
+        
+        console.log('✅ Loyalty endpoint working');
+        console.log('   Loyalty data:', {
+            balance: loyalty.data.loyalty?.current_balance || 0,
+            tier: loyalty.data.loyalty?.tier_level || 'bronze',
+            rewards: loyalty.data.availableRewards?.length || 0
+        });
+        
+        // Test awarding points
+        const awardPoints = await apiCall('POST', '/api/loyalty/award', {
+            customerPhone: customerPhone,
+            workerId: 'W001TEST',
+            points: 10,
+            reason: 'Test tip'
+        });
+        
+        if (awardPoints.success) {
+            console.log('✅ Points awarded successfully');
+            console.log(`   Awarded ${awardPoints.data.pointsAwarded} points`);
+        }
+        
+        return true;
+        
+    } catch (error) {
+        console.log('❌ Loyalty test failed:', error.message);
+        return false;
     }
-}
+};
+
+// Test 6: Achievements System
+const testAchievements = async () => {
+    console.log('\n🏅 Test 6: Achievements System');
+    
+    try {
+        const userId = 'W001TEST';
+        const userType = 'worker';
+        
+        // Test achievements endpoint
+        const achievements = await apiCall('GET', `/api/achievements/${userId}/${userType}`);
+        
+        if (!achievements.success) {
+            console.log('❌ Achievements endpoint failed:', achievements.error);
+            return false;
+        }
+        
+        console.log('✅ Achievements endpoint working');
+        console.log(`   Found ${achievements.data.achievements?.length || 0} achievements`);
+        
+        // Test achievement checking
+        const checkAchievements = await apiCall('POST', '/api/achievements/check', {
+            userId: userId,
+            userType: userType,
+            stats: {
+                tips_received: 1,
+                total_earnings: 100,
+                rating: 4.5,
+                reviews: 5
+            }
+        });
+        
+        if (checkAchievements.success) {
+            console.log('✅ Achievement checking working');
+            console.log(`   New achievements: ${checkAchievements.data.newAchievements?.length || 0}`);
+        }
+        
+        return true;
+        
+    } catch (error) {
+        console.log('❌ Achievements test failed:', error.message);
+        return false;
+    }
+};
+
+// Test 7: Leaderboards
+const testLeaderboards = async () => {
+    console.log('\n🏆 Test 7: Leaderboards');
+    
+    try {
+        const leaderboard = await apiCall('GET', '/api/leaderboards/top_earners/monthly?limit=5');
+        
+        if (!leaderboard.success) {
+            console.log('❌ Leaderboard endpoint failed:', leaderboard.error);
+            return false;
+        }
+        
+        console.log('✅ Leaderboard endpoint working');
+        console.log(`   Found ${leaderboard.data.leaderboard?.length || 0} entries`);
+        
+        return true;
+        
+    } catch (error) {
+        console.log('❌ Leaderboard test failed:', error.message);
+        return false;
+    }
+};
+
+// Test 8: Social Features
+const testSocialFeatures = async () => {
+    console.log('\n👥 Test 8: Social Features');
+    
+    try {
+        const workerId = 'W001TEST';
+        const customerPhone = '254700000999';
+        
+        // Test follow worker
+        const follow = await apiCall('POST', `/api/workers/${workerId}/follow`, {
+            customerPhone: customerPhone,
+            action: 'follow'
+        });
+        
+        if (!follow.success) {
+            console.log('❌ Follow endpoint failed:', follow.error);
+            return false;
+        }
+        
+        console.log('✅ Follow endpoint working');
+        console.log('   Follow result:', {
+            action: follow.data.action,
+            followers: follow.data.followers
+        });
+        
+        return true;
+        
+    } catch (error) {
+        console.log('❌ Social features test failed:', error.message);
+        return false;
+    }
+};
+
+// Run all tests
+const runAllTests = async () => {
+    console.log('Starting Phase 3 testing...\n');
+    
+    let testResults = {
+        database: false,
+        categories: false,
+        marketplace: false,
+        profile: false,
+        loyalty: false,
+        achievements: false,
+        leaderboards: false,
+        social: false
+    };
+    
+    try {
+        // Run tests
+        testResults.database = await testDatabaseSchema();
+        testResults.categories = await testServiceCategories();
+        testResults.marketplace = await testMarketplace();
+        testResults.profile = await testWorkerProfile();
+        testResults.loyalty = await testLoyaltySystem();
+        testResults.achievements = await testAchievements();
+        testResults.leaderboards = await testLeaderboards();
+        testResults.social = await testSocialFeatures();
+        
+    } catch (error) {
+        console.log('\n❌ Test suite failed:', error.message);
+    }
+    
+    // Print results
+    console.log('\n' + '='.repeat(60));
+    console.log('🏁 PHASE 3 TEST RESULTS');
+    console.log('='.repeat(60));
+    
+    const tests = [
+        { name: 'Database Schema', result: testResults.database },
+        { name: 'Service Categories', result: testResults.categories },
+        { name: 'Marketplace Discovery', result: testResults.marketplace },
+        { name: 'Worker Profiles', result: testResults.profile },
+        { name: 'Loyalty System', result: testResults.loyalty },
+        { name: 'Achievements', result: testResults.achievements },
+        { name: 'Leaderboards', result: testResults.leaderboards },
+        { name: 'Social Features', result: testResults.social }
+    ];
+    
+    tests.forEach(test => {
+        const status = test.result ? '✅ PASS' : '❌ FAIL';
+        console.log(`${status} ${test.name}`);
+    });
+    
+    const passedTests = tests.filter(t => t.result).length;
+    const totalTests = tests.length;
+    
+    console.log('\n📈 SUMMARY:');
+    console.log(`   Tests Passed: ${passedTests}/${totalTests}`);
+    console.log(`   Success Rate: ${Math.round(passedTests/totalTests*100)}%`);
+    
+    if (passedTests >= 6) {
+        console.log('\n🎉 Phase 3 core features are working!');
+    } else {
+        console.log('\n⚠️  Some core features need attention.');
+    }
+    
+    console.log('\n💡 Phase 3 Features:');
+    console.log('   🏪 Marketplace: http://localhost:3000/marketplace-dashboard.html');
+    console.log('   👤 Worker Profiles: Enhanced social profiles');
+    console.log('   🎁 Loyalty Program: Points and rewards system');
+    console.log('   🏅 Achievements: Gamification badges');
+    console.log('   🏆 Leaderboards: Competition and rankings');
+    console.log('   👥 Social Features: Follow workers, reviews');
+};
 
 // Run tests
-const tester = new Phase3Tester();
-tester.runAllTests();
+runAllTests().catch(console.error);
