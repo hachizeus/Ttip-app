@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, Image } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
 import { supabase, Worker } from '../../lib/supabase'
 import { initiateMpesaPayment } from '../../lib/mpesa'
 import { formatPhoneForAPI, validateKenyanPhone, formatPhoneForDisplay } from '../../lib/phone-utils'
 import { getCurrentUser } from '../../lib/auth'
+import { NetworkManager } from '../../lib/network-manager'
+import { OfflinePayment } from '../../lib/offline-payment'
+import { OfflineStorage } from '../../lib/offline-storage'
 
 export default function TipScreen() {
   const { workerID, fromScanner } = useLocalSearchParams()
@@ -61,6 +64,13 @@ export default function TipScreen() {
     return true
   }
 
+  // Store worker data for offline access
+  useEffect(() => {
+    if (worker && workerID) {
+      OfflineStorage.storeWorkerData(workerID as string, worker)
+    }
+  }, [worker, workerID])
+
   const handleSendTip = async () => {
     if (!amount || !customerPhone) {
       Alert.alert('Error', 'Please enter amount and phone number')
@@ -83,21 +93,34 @@ export default function TipScreen() {
     setLoading(true)
     try {
       const apiPhone = formatPhoneForAPI(customerPhone)
-      const paymentResponse = await initiateMpesaPayment(apiPhone, tipAmount, workerID as string)
+      const isOnline = NetworkManager.getIsOnline()
       
-      const { error } = await supabase
-        .from('tips')
-        .insert({
-          worker_id: workerID,
+      if (isOnline) {
+        // Online payment
+        const paymentResponse = await initiateMpesaPayment(apiPhone, tipAmount, workerID as string)
+        
+        const { error } = await supabase
+          .from('tips')
+          .insert({
+            worker_id: workerID,
+            amount: tipAmount,
+            customer_phone: apiPhone,
+            transaction_id: paymentResponse.CheckoutRequestID,
+            status: 'pending'
+          })
+
+        if (error) throw error
+        Alert.alert('Success', 'Payment request sent to your phone!')
+      } else {
+        // Offline payment
+        const result = await OfflinePayment.processOfflinePayment({
+          workerId: workerID as string,
           amount: tipAmount,
-          customer_phone: apiPhone,
-          transaction_id: paymentResponse.CheckoutRequestID,
-          status: 'pending'
+          phone: apiPhone
         })
-
-      if (error) throw error
-
-      Alert.alert('Success', 'Payment request sent to your phone!')
+        Alert.alert('Offline Mode', result.message + '\n\nYour tip will be processed when internet connection is restored.')
+      }
+      
       setAmount('')
       setCustomerPhone('')
     } catch (error) {
@@ -118,8 +141,14 @@ export default function TipScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
+        <Image source={require('../../assets/images/mylogo.png')} style={styles.logo} />
         <Text style={styles.title}>💰 Tip {worker.name}</Text>
         <Text style={styles.subtitle}>{worker.occupation}</Text>
+        <View style={styles.workerCard}>
+          <Text style={styles.workerName}>{worker.name}</Text>
+          <Text style={styles.workerOccupation}>{worker.occupation}</Text>
+          {worker.bio && <Text style={styles.workerBio}>{worker.bio}</Text>}
+        </View>
       </View>
 
       <View style={styles.form}>
@@ -153,7 +182,28 @@ export default function TipScreen() {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.infoSection}>
+        <Text style={styles.infoTitle}>How it works:</Text>
+        <View style={styles.infoItem}>
+          <Text style={styles.infoEmoji}>1️⃣</Text>
+          <Text style={styles.infoText}>Enter tip amount</Text>
+        </View>
+        <View style={styles.infoItem}>
+          <Text style={styles.infoEmoji}>2️⃣</Text>
+          <Text style={styles.infoText}>Enter your phone number</Text>
+        </View>
+        <View style={styles.infoItem}>
+          <Text style={styles.infoEmoji}>3️⃣</Text>
+          <Text style={styles.infoText}>Complete M-Pesa payment</Text>
+        </View>
+        <View style={styles.infoItem}>
+          <Text style={styles.infoEmoji}>✅</Text>
+          <Text style={styles.infoText}>Worker receives tip instantly!</Text>
+        </View>
+      </View>
+
       <View style={styles.footer}>
+        <Image source={require('../../assets/images/mylogo.png')} style={styles.footerLogo} />
         <Text style={styles.footerText}>Powered by TTip</Text>
       </View>
     </ScrollView>
@@ -163,31 +213,75 @@ export default function TipScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f9fa',
   },
   scrollContent: {
-    paddingTop: 50,
+    paddingTop: 30,
     paddingHorizontal: 20,
     paddingBottom: 30,
     flexGrow: 1,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
-    marginTop: 40,
+    marginBottom: 30,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    marginBottom: 20,
+    borderRadius: 40,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#0052CC',
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  workerCard: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    width: '100%',
+    alignItems: 'center',
+  },
+  workerName: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 5,
   },
-  subtitle: {
+  workerOccupation: {
     fontSize: 16,
+    color: '#FF6B00',
+    marginBottom: 10,
+  },
+  workerBio: {
+    fontSize: 14,
     color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   form: {
-    flex: 1,
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   label: {
     fontSize: 16,
@@ -208,16 +302,16 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   tipButton: {
-    backgroundColor: '#00C851',
+    backgroundColor: '#0052CC',
     padding: 18,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -227,9 +321,48 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  infoSection: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  infoEmoji: {
+    fontSize: 18,
+    marginRight: 12,
+    width: 25,
+  },
+  infoText: {
+    fontSize: 16,
+    color: '#666',
+    flex: 1,
+  },
   footer: {
     alignItems: 'center',
     paddingBottom: 20,
+  },
+  footerLogo: {
+    width: 40,
+    height: 40,
+    marginBottom: 10,
+    borderRadius: 20,
   },
   footerText: {
     fontSize: 12,

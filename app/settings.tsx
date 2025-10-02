@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, TextInput, Image } from 'react-native'
+import { MaterialIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import React, { useEffect, useState } from 'react'
+import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { getCurrentUser } from '../lib/auth'
 import { supabase } from '../lib/supabase'
-import { MaterialIcons } from '@expo/vector-icons'
-import { useTheme, ThemeProvider } from '../lib/theme-context'
+import { useTheme } from '../lib/theme-context'
+
 import * as ImagePicker from 'expo-image-picker'
 import { fonts, fontWeights } from '../lib/fonts'
 
-function SettingsContent() {
+export default function SettingsScreen() {
   const { colors } = useTheme()
   const [userPhone, setUserPhone] = useState('')
   const [name, setName] = useState('')
@@ -226,14 +227,6 @@ function SettingsContent() {
   )
 }
 
-export default function SettingsScreen() {
-  return (
-    <ThemeProvider>
-      <SettingsContent />
-    </ThemeProvider>
-  )
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -245,8 +238,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    // borderBottomWidth: 1,
+    // borderBottomColor: '#f0f0f0',
   },
   backButton: {
     padding: 4,

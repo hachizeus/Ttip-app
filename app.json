@@ -1,49 +1,64 @@
 {
   "expo": {
     "name": "TTip",
-    "slug": "ttip-app",
+    "slug": "ttip-digital-tipping",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "ttip",
+    "icon": "./assets/images/mylogo.png",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "image": "./assets/images/mylogo.png",
+      "resizeMode": "contain"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ttip.app"
+      "bundleIdentifier": "com.ttip.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses camera to scan QR codes for tipping",
+        "NSFaceIDUsageDescription": "Use Face ID to securely authenticate and access your account"
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/mylogo.png"
       },
       "package": "com.ttip.app",
-      "widgets": [
-        {
-          "name": "QRWidget",
-          "description": "Show your TTip QR code",
-          "minWidth": 2,
-          "minHeight": 2,
-          "maxWidth": 4,
-          "maxHeight": 4,
-          "previewImage": "./assets/images/widget-preview.png"
-        }
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
       ]
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/mylogo.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Use Face ID to authenticate yourself."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "scheme": "ttip",
+    "privacy": "public",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ee134ee9-2703-44c2-8c92-f1a65e3d8b1f"
+      }
+    },
+    "owner": "elitjohns"
   }
 }

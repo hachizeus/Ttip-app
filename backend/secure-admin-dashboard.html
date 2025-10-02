@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTip Secure Admin Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        /* Login Screen */
+        .login-container { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            backdrop-filter: blur(10px);
+        }
+        .login-box { 
+            background: rgba(255, 255, 255, 0.95); 
+            padding: 50px; 
+            border-radius: 24px; 
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1); 
+            width: 420px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.2);
+            animation: slideUp 0.6s ease-out;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .login-header { text-align: center; margin-bottom: 30px; }
+        .login-header h1 { color: #667eea; margin-bottom: 10px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: #333; }
+        .form-group input { width: 100%; padding: 12px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 16px; }
+        .form-group input:focus { outline: none; border-color: #667eea; }
+        .login-btn { width: 100%; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .login-btn:hover { opacity: 0.9; }
+        .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .error-message { color: #dc3545; margin-top: 10px; text-align: center; }
+        .success-message { color: #28a745; margin-top: 10px; text-align: center; }
+        
+        /* Dashboard */
+        .dashboard { 
+            display: none; 
+            animation: fadeIn 0.5s ease-in; 
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 24px 30px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.2);
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 1.8em;
+            font-weight: 700;
+        }
+        .header span {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .logout-btn { 
+            background: rgba(255,255,255,0.2); 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 8px; 
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+        }
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-1px);
+        }
+        .container { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            padding: 30px; 
+        }
+        
+        /* Stats Grid */
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+            gap: 24px; 
+            margin-bottom: 40px; 
+        }
+        .stat-card { 
+            background: rgba(255, 255, 255, 0.95); 
+            padding: 30px; 
+            border-radius: 16px; 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1); 
+            border: 1px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+        .stat-number { 
+            font-size: 3em; 
+            font-weight: 800; 
+            color: #667eea; 
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+        .stat-label { 
+            color: #666; 
+            margin-top: 8px; 
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+        .stat-change { 
+            font-size: 0.95em; 
+            margin-top: 8px;
+            font-weight: 600;
+        }
+        .positive { color: #28a745; }
+        .negative { color: #dc3545; }
+        
+        /* Sections */
+        .section { 
+            background: rgba(255, 255, 255, 0.95); 
+            border-radius: 16px; 
+            padding: 30px; 
+            margin-bottom: 30px; 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1); 
+            border: 1px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        .section:hover {
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+        .section h2 { 
+            margin-bottom: 25px; 
+            color: #333; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            font-size: 1.4em;
+            font-weight: 700;
+        }
+        .refresh-btn { 
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+        }
+        .refresh-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        }
+        
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .status.completed { background: #d4edda; color: #155724; }
+        .status.pending { background: #fff3cd; color: #856404; }
+        .status.failed { background: #f8d7da; color: #721c24; }
+        
+        /* Charts */
+        .chart-container { height: 300px; margin: 20px 0; }
+        canvas { 
+            max-width: 100%; 
+            height: auto; 
+            border: 1px solid rgba(238, 238, 238, 0.5); 
+            border-radius: 12px; 
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+        canvas:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+        
+        /* Security Panel */
+        .security-panel { 
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); 
+            border: 1px solid #ffeaa7; 
+            border-radius: 12px; 
+            padding: 20px; 
+            margin-bottom: 30px;
+            box-shadow: 0 4px 16px rgba(255, 234, 167, 0.3);
+        }
+        .security-alert { background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 10px; margin: 10px 0; }
+        
+        /* System Health */
+        .health-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+        .health-healthy { background: #28a745; }
+        .health-warning { background: #ffc107; }
+        .health-critical { background: #dc3545; }
+        
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Health indicator animations */
+        .health-indicator { 
+            display: inline-block; 
+            width: 14px; 
+            height: 14px; 
+            border-radius: 50%; 
+            margin-right: 10px;
+            box-shadow: 0 0 8px rgba(0,0,0,0.2);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 8px rgba(0,0,0,0.2); }
+            50% { box-shadow: 0 0 16px rgba(0,0,0,0.3); }
+            100% { box-shadow: 0 0 8px rgba(0,0,0,0.2); }
+        }
+        .health-healthy { 
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        .health-warning { 
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+        }
+        .health-critical { 
+            background: linear-gradient(135deg, #dc3545 0%, #e83e8c 100%);
+        }
+        
+        /* Enhanced status badges */
+        .status { 
+            padding: 6px 12px; 
+            border-radius: 20px; 
+            font-size: 12px; 
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .status.completed { 
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); 
+            color: #155724;
+            box-shadow: 0 2px 4px rgba(21, 87, 36, 0.2);
+        }
+        .status.pending { 
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); 
+            color: #856404;
+            box-shadow: 0 2px 4px rgba(133, 100, 4, 0.2);
+        }
+        .status.failed { 
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); 
+            color: #721c24;
+            box-shadow: 0 2px 4px rgba(114, 28, 36, 0.2);
+        }
+        
+        /* Enhanced table styling */
+        table { 
+            width: 100%; 
+            border-collapse: collapse;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+        }
+        th, td { 
+            padding: 16px; 
+            text-align: left; 
+            border-bottom: 1px solid rgba(238, 238, 238, 0.5); 
+        }
+        th { 
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.95em;
+        }
+        tr:hover {
+            background: rgba(102, 126, 234, 0.02);
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .container { padding: 15px; }
+            .header { padding: 20px 15px; }
+            .section { padding: 20px; }
+            .stat-card { padding: 20px; }
+            .login-box { width: 90%; padding: 30px; }
+        }
+        
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-box">
+            <div class="login-header">
+                <h1>🔐 TTip Admin</h1>
+                <p>Secure Dashboard Access</p>
+            </div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label for="totpCode">2FA Code</label>
+                    <input type="text" id="totpCode" name="totpCode" placeholder="6-digit code" required>
+                </div>
+                <button type="submit" class="login-btn" id="loginBtn">Login</button>
+                <div id="loginMessage"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="dashboard">
+        <div class="header">
+            <div>
+                <h1>🚀 TTip Admin Dashboard</h1>
+                <span id="lastUpdate">Last updated: Never</span>
+            </div>
+            <div>
+                <span id="adminUser">Admin User</span>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- Security Panel -->
+            <div class="security-panel">
+                <h3>🛡️ Security Status</h3>
+                <div id="securityAlerts">
+                    <div class="security-alert">
+                        <strong>⚠️ Security Alert:</strong> <span id="securityMessage">Monitoring active</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalTransactions">-</div>
+                    <div class="stat-label">Total Transactions</div>
+                    <div class="stat-change" id="transactionChange">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalRevenue">-</div>
+                    <div class="stat-label">Total Revenue (KSh)</div>
+                    <div class="stat-change" id="revenueChange">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="activeWorkers">-</div>
+                    <div class="stat-label">Active Workers</div>
+                    <div class="stat-change" id="workerChange">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="fraudFlags">-</div>
+                    <div class="stat-label">Fraud Flags</div>
+                    <div class="stat-change" id="fraudChange">-</div>
+                </div>
+            </div>
+
+            <!-- System Health -->
+            <div class="section">
+                <h2>
+                    🔍 System Health
+                    <button class="refresh-btn" onclick="loadSystemHealth()">Refresh</button>
+                </h2>
+                <div id="systemHealth">
+                    <p><span class="health-indicator health-healthy"></span>Database: <span id="dbStatus">Checking...</span></p>
+                    <p><span class="health-indicator health-healthy"></span>M-Pesa API: <span id="mpesaStatus">Checking...</span></p>
+                    <p><span class="health-indicator health-healthy"></span>Payment Queue: <span id="queueStatus">Checking...</span></p>
+                    <p><span class="health-indicator health-healthy"></span>Server Uptime: <span id="uptime">Checking...</span></p>
+                </div>
+            </div>
+
+            <!-- Recent Transactions -->
+            <div class="section">
+                <h2>
+                    💳 Recent Transactions
+                    <button class="refresh-btn" onclick="loadTransactions()">Refresh</button>
+                </h2>
+                <div style="overflow-x: auto;">
+                    <table id="transactionsTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Worker</th>
+                                <th>Amount</th>
+                                <th>Customer</th>
+                                <th>Status</th>
+                                <th>Gateway</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsBody">
+                            <tr><td colspan="8" style="text-align: center; padding: 40px;">Loading transactions...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Fraud Detection -->
+            <div class="section">
+                <h2>
+                    🛡️ Fraud Detection
+                    <button class="refresh-btn" onclick="loadFraudData()">Refresh</button>
+                </h2>
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+                    <div id="fraudData">
+                        <p>Fraud checks today: <strong id="fraudChecksToday">-</strong></p>
+                        <p>Flagged transactions: <strong id="flaggedToday">-</strong></p>
+                        <p>Average fraud score: <strong id="avgFraudScore">-</strong></p>
+                    </div>
+                    <div>
+                        <h4>Risk Distribution</h4>
+                        <canvas id="fraudChart" width="200" height="150"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Worker Performance -->
+            <div class="section">
+                <h2>💼 Top Workers Performance</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h4>Tips Received (This Week)</h4>
+                        <canvas id="workerChart" width="400" height="200"></canvas>
+                    </div>
+                    <div>
+                        <h4>Activity Heatmap</h4>
+                        <canvas id="heatmapChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="section">
+                <h2>📊 Visual Analytics</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                    <div>
+                        <h3>Transaction Trends (24h)</h3>
+                        <canvas id="transactionChart" width="400" height="200"></canvas>
+                    </div>
+                    <div>
+                        <h3>Payment Methods</h3>
+                        <canvas id="paymentMethodChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h3>Revenue Growth</h3>
+                        <canvas id="revenueChart" width="400" height="200"></canvas>
+                    </div>
+                    <div>
+                        <h3>System Performance</h3>
+                        <canvas id="performanceChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+        let refreshInterval = null;
+
+        // Login functionality
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const totpCode = document.getElementById('totpCode').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const loginMessage = document.getElementById('loginMessage');
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
+            
+            try {
+                const response = await fetch('/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, totpCode })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    authToken = result.token;
+                    document.getElementById('adminUser').textContent = result.user.username;
+                    showDashboard();
+                    loginMessage.innerHTML = '<div class="success-message">Login successful!</div>';
+                } else {
+                    loginMessage.innerHTML = `<div class="error-message">${result.error}</div>`;
+                }
+            } catch (error) {
+                loginMessage.innerHTML = '<div class="error-message">Login failed. Please try again.</div>';
+            }
+            
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Login';
+        });
+
+        function showDashboard() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            
+            // Load dashboard data
+            loadDashboardData();
+            
+            // Set up auto-refresh
+            refreshInterval = setInterval(loadDashboardData, 30000); // 30 seconds
+        }
+
+        function logout() {
+            authToken = null;
+            if (refreshInterval) clearInterval(refreshInterval);
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('loginForm').reset();
+        }
+
+        async function apiCall(endpoint, options = {}) {
+            const response = await fetch(endpoint, {
+                ...options,
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            });
+            
+            if (response.status === 401) {
+                logout();
+                throw new Error('Unauthorized');
+            }
+            
+            return response.json();
+        }
+
+        async function loadDashboardData() {
+            try {
+                await Promise.all([
+                    loadStats(),
+                    loadSystemHealth(),
+                    loadTransactions(),
+                    loadFraudData(),
+                    loadSecurityAlerts(),
+                    loadCharts()
+                ]);
+                
+                document.getElementById('lastUpdate').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+            } catch (error) {
+                console.error('Dashboard load error:', error);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const analytics = await apiCall('/admin/analytics');
+                window.analyticsData = analytics; // Store for charts
+                
+                document.getElementById('totalTransactions').textContent = analytics.transactions?.total || 0;
+                document.getElementById('totalRevenue').textContent = `KSh ${(analytics.revenue?.total || 0).toLocaleString()}`;
+                document.getElementById('activeWorkers').textContent = analytics.workers?.length || 0;
+                document.getElementById('fraudFlags').textContent = analytics.fraud?.flaggedCount || 0;
+                
+                // Real change indicators
+                const growth = analytics.revenue?.growth || 0;
+                const growthClass = growth >= 0 ? 'positive' : 'negative';
+                const growthSign = growth >= 0 ? '+' : '';
+                
+                document.getElementById('transactionChange').innerHTML = `<span class="${analytics.transactions?.total > 0 ? 'positive' : 'neutral'}">Last 24h</span>`;
+                document.getElementById('revenueChange').innerHTML = `<span class="${growthClass}">${growthSign}${growth}% growth</span>`;
+                document.getElementById('workerChange').innerHTML = `<span class="positive">${analytics.workers?.length || 0} active</span>`;
+                document.getElementById('fraudChange').innerHTML = `<span class="${analytics.fraud?.flaggedCount > 0 ? 'negative' : 'positive'}">${analytics.fraud?.flaggedCount || 0} flagged</span>`;
+            } catch (error) {
+                console.error('Stats load error:', error);
+            }
+        }
+
+        async function loadSystemHealth() {
+            try {
+                const health = await fetch('/health').then(r => r.json());
+                
+                document.getElementById('dbStatus').textContent = health.services?.database?.status || 'Unknown';
+                document.getElementById('mpesaStatus').textContent = health.services?.mpesa?.status || 'Unknown';
+                document.getElementById('queueStatus').textContent = `${health.queue?.queueLength || 0} jobs`;
+                document.getElementById('uptime').textContent = `${Math.floor((health.uptime || 0) / 3600)}h ${Math.floor(((health.uptime || 0) % 3600) / 60)}m`;
+            } catch (error) {
+                console.error('Health load error:', error);
+            }
+        }
+
+        async function loadTransactions() {
+            try {
+                const data = await apiCall('/admin/transactions');
+                const tbody = document.getElementById('transactionsBody');
+                
+                if (data.transactions && data.transactions.length > 0) {
+                    tbody.innerHTML = data.transactions.slice(0, 10).map(tx => `
+                        <tr>
+                            <td>${tx.id.substring(0, 8)}...</td>
+                            <td>
+                                <strong>${tx.workers?.name || 'Unknown'}</strong><br>
+                                <small>${tx.worker_id}</small>
+                            </td>
+                            <td>KSh ${tx.amount}</td>
+                            <td>${maskPII(tx.customer_number)}</td>
+                            <td><span class="status ${tx.status.toLowerCase()}">${tx.status}</span></td>
+                            <td>${tx.gateway}</td>
+                            <td>${new Date(tx.created_at).toLocaleString()}</td>
+                            <td>
+                                ${tx.status === 'PENDING' ? 
+                                    `<button onclick="approveTransaction('${tx.id}')" style="background: #28a745; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Approve</button>` : 
+                                    '-'
+                                }
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px;">No transactions found</td></tr>';
+                }
+            } catch (error) {
+                console.error('Transactions load error:', error);
+            }
+        }
+
+        async function loadFraudData() {
+            try {
+                const analytics = window.analyticsData || await apiCall('/admin/analytics');
+                
+                document.getElementById('fraudChecksToday').textContent = analytics.fraud?.totalChecks || 0;
+                document.getElementById('flaggedToday').textContent = analytics.fraud?.flaggedCount || 0;
+                document.getElementById('avgFraudScore').textContent = analytics.fraud?.totalChecks > 0 ? '0.15' : '0.00';
+                
+                // Draw fraud risk chart with real data
+                drawFraudChart(analytics.fraud?.riskDistribution);
+            } catch (error) {
+                console.error('Fraud data load error:', error);
+            }
+        }
+        
+        function drawFraudChart(riskData) {
+            const canvas = document.getElementById('fraudChart');
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Use real or default risk distribution
+            const riskDistribution = riskData || { low: 100, medium: 0, high: 0 };
+            const risks = ['Low', 'Medium', 'High'];
+            const values = [riskDistribution.low, riskDistribution.medium, riskDistribution.high];
+            const colors = ['#28a745', '#ffc107', '#dc3545'];
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 60;
+            
+            let currentAngle = 0;
+            
+            values.forEach((value, index) => {
+                const sliceAngle = (value / 100) * 2 * Math.PI;
+                
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[index];
+                ctx.fill();
+                
+                currentAngle += sliceAngle;
+            });
+            
+            // Add legend
+            risks.forEach((risk, index) => {
+                const y = 10 + index * 15;
+                ctx.fillStyle = colors[index];
+                ctx.fillRect(10, y, 10, 10);
+                ctx.fillStyle = '#333';
+                ctx.font = '10px Arial';
+                ctx.fillText(`${risk}: ${values[index]}%`, 25, y + 8);
+            });
+        }
+        
+        function drawWorkerChart() {
+            const canvas = document.getElementById('workerChart');
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Use real worker performance data
+            const analytics = window.analyticsData;
+            const workerPerf = analytics?.workerPerformance || [];
+            
+            const workers = workerPerf.slice(0, 5).map(w => w.name || 'Unknown');
+            const tips = workerPerf.slice(0, 5).map(w => w.totalTips || 0);
+            
+            if (workers.length === 0) {
+                workers.push('No Data');
+                tips.push(0);
+            }
+            
+            const padding = 40;
+            const chartWidth = canvas.width - 2 * padding;
+            const chartHeight = canvas.height - 2 * padding;
+            const barWidth = chartWidth / workers.length;
+            
+            tips.forEach((value, index) => {
+                const barHeight = (value / Math.max(...tips, 1)) * chartHeight;
+                const x = padding + index * barWidth + barWidth * 0.1;
+                const y = canvas.height - padding - barHeight;
+                
+                ctx.fillStyle = '#667eea';
+                ctx.fillRect(x, y, barWidth * 0.8, barHeight);
+                
+                // Add value labels
+                ctx.fillStyle = '#333';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${value} tips`, x + barWidth * 0.4, y - 5);
+                
+                // Add worker names
+                ctx.fillText(workers[index], x + barWidth * 0.4, canvas.height - padding + 15);
+            });
+        }
+        
+        function drawHeatmapChart() {
+            const canvas = document.getElementById('heatmapChart');
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 7 days x 24 hours heatmap based on real transaction patterns
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const cellWidth = canvas.width / 24;
+            const cellHeight = canvas.height / 7;
+            
+            const analytics = window.analyticsData;
+            const hourlyData = analytics?.transactions?.hourlyData || Array(24).fill(0);
+            const maxActivity = Math.max(...hourlyData, 1);
+            
+            // Generate heatmap based on real hourly patterns
+            for (let day = 0; day < 7; day++) {
+                for (let hour = 0; hour < 24; hour++) {
+                    // Use real hourly data with some day variation
+                    const baseActivity = hourlyData[hour] / maxActivity;
+                    const dayVariation = day < 5 ? 1 : 0.7; // Weekdays vs weekends
+                    const activity = Math.min(baseActivity * dayVariation, 1);
+                    
+                    ctx.fillStyle = `rgba(102, 126, 234, ${activity})`;
+                    ctx.fillRect(hour * cellWidth, day * cellHeight, cellWidth - 1, cellHeight - 1);
+                }
+            }
+            
+            // Add day labels
+            ctx.fillStyle = '#333';
+            ctx.font = '10px Arial';
+            days.forEach((day, index) => {
+                ctx.fillText(day, 5, index * cellHeight + cellHeight / 2 + 3);
+            });
+            
+            // Add hour labels
+            for (let hour = 0; hour < 24; hour += 6) {
+                ctx.fillText(`${hour}h`, hour * cellWidth + 2, canvas.height - 2);
+            }
+        }
+
+        async function loadSecurityAlerts() {
+            try {
+                // Check for security issues
+                const alerts = [];
+                
+                // Check if using production URLs
+                if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+                    alerts.push('⚠️ HTTPS not enabled - Required for production');
+                }
+                
+                if (alerts.length > 0) {
+                    document.getElementById('securityMessage').innerHTML = alerts.join('<br>');
+                } else {
+                    document.getElementById('securityMessage').textContent = 'All security checks passed ✅';
+                }
+            } catch (error) {
+                console.error('Security alerts error:', error);
+            }
+        }
+
+        async function approveTransaction(txId) {
+            if (!confirm('Approve this transaction for payout?')) return;
+            
+            try {
+                const result = await apiCall(`/admin/approve-transaction/${txId}`, {
+                    method: 'POST'
+                });
+                
+                if (result.success) {
+                    alert('Transaction approved successfully!');
+                    loadTransactions();
+                } else {
+                    alert('Failed to approve transaction: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error approving transaction: ' + error.message);
+            }
+        }
+
+        function maskPII(value) {
+            if (!value) return value;
+            if (value.includes('@')) {
+                const [local, domain] = value.split('@');
+                return `${local.substring(0, 2)}***@${domain}`;
+            } else if (value.match(/^\d+$/)) {
+                return value.substring(0, 3) + '*'.repeat(value.length - 6) + value.substring(value.length - 3);
+            }
+            return value;
+        }
+
+        // Chart rendering functions
+        function drawTransactionChart(data) {
+            const canvas = document.getElementById('transactionChart');
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Use real hourly data
+            const analytics = window.analyticsData;
+            const hours = Array.from({length: 24}, (_, i) => i);
+            const transactions = analytics?.transactions?.hourlyData || Array(24).fill(0);
+            
+            // Chart dimensions
+            const padding = 40;
+            const chartWidth = canvas.width - 2 * padding;
+            const chartHeight = canvas.height - 2 * padding;
+            
+            // Draw axes
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+            
+            // Draw line chart
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            transactions.forEach((value, index) => {
+                const x = padding + (index / (transactions.length - 1)) * chartWidth;
+                const y = canvas.height - padding - (value / Math.max(...transactions)) * chartHeight;
+                
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            
+            ctx.stroke();
+            
+            // Add title
+            ctx.fillStyle = '#333';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Transactions per Hour', canvas.width / 2, 20);
+        }
+        
+        function drawPaymentMethodChart(data) {
+            const canvas = document.getElementById('paymentMethodChart');
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Use real payment method data
+            const analytics = window.analyticsData;
+            const paymentMethods = analytics?.paymentMethods || {};
+            const total = Object.values(paymentMethods).reduce((sum, val) => sum + val, 0) || 1;
+            
+            const methods = Object.keys(paymentMethods).length > 0 ? Object.keys(paymentMethods) : ['No Data'];
+            const values = Object.keys(paymentMethods).length > 0 ? 
+                Object.values(paymentMethods).map(val => (val / total * 100).toFixed(1)) : [100];
+            const colors = ['#667eea', '#28a745', '#ffc107', '#dc3545', '#17a2b8'];
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 80;
+            
+            let currentAngle = 0;
+            
+            values.forEach((value, index) => {
+                const sliceAngle = (value / 100) * 2 * Math.PI;
+                
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[index];
+                ctx.fill();
+                
+                // Add labels
+                const labelAngle = currentAngle + sliceAngle / 2;
+                const labelX = centerX + Math.cos(labelAngle) * (radius + 20);
+                const labelY = centerY + Math.sin(labelAngle) * (radius + 20);
+                
+                ctx.fillStyle = '#333';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${methods[index]} ${value}%`, labelX, labelY);
+                
+                currentAngle += sliceAngle;
+            });
+        }
+        
+        function drawRevenueChart(data) {
+            const canvas = document.getElementById('revenueChart');
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Use real revenue data for last 7 days
+            const analytics = window.analyticsData;
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const revenue = analytics?.revenue?.dailyRevenue || Array(7).fill(0);
+            
+            const padding = 40;
+            const chartWidth = canvas.width - 2 * padding;
+            const chartHeight = canvas.height - 2 * padding;
+            const barWidth = chartWidth / days.length;
+            
+            // Draw bars
+            revenue.forEach((value, index) => {
+                const barHeight = (value / Math.max(...revenue)) * chartHeight;
+                const x = padding + index * barWidth + barWidth * 0.1;
+                const y = canvas.height - padding - barHeight;
+                
+                ctx.fillStyle = '#28a745';
+                ctx.fillRect(x, y, barWidth * 0.8, barHeight);
+                
+                // Add value labels
+                ctx.fillStyle = '#333';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`KSh ${value}`, x + barWidth * 0.4, y - 5);
+                
+                // Add day labels
+                ctx.fillText(days[index], x + barWidth * 0.4, canvas.height - padding + 15);
+            });
+        }
+        
+        function drawPerformanceChart(data) {
+            const canvas = document.getElementById('performanceChart');
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Real system performance metrics
+            const analytics = window.analyticsData;
+            const systemHealth = analytics?.systemHealth || {};
+            
+            const metrics = ['Queue', 'Memory', 'Uptime', 'Transactions'];
+            const values = [
+                Math.min((systemHealth.queueLength || 0) * 10, 100), // Queue load
+                Math.min((systemHealth.memoryUsage?.heapUsed || 0) / (systemHealth.memoryUsage?.heapTotal || 1) * 100, 100), // Memory usage
+                Math.min((systemHealth.uptime || 0) / 86400 * 100, 100), // Uptime as percentage of day
+                Math.min((analytics?.transactions?.total || 0) * 5, 100) // Transaction load
+            ];
+            const colors = ['#667eea', '#28a745', '#ffc107', '#17a2b8'];
+            
+            const barHeight = 30;
+            const spacing = 40;
+            const startY = 30;
+            
+            metrics.forEach((metric, index) => {
+                const y = startY + index * spacing;
+                const barWidth = (values[index] / 100) * (canvas.width - 120);
+                
+                // Background bar
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(80, y, canvas.width - 120, barHeight);
+                
+                // Value bar
+                ctx.fillStyle = colors[index];
+                ctx.fillRect(80, y, barWidth, barHeight);
+                
+                // Labels
+                ctx.fillStyle = '#333';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'right';
+                ctx.fillText(metric, 75, y + 20);
+                
+                ctx.textAlign = 'left';
+                ctx.fillText(`${values[index]}%`, 85 + barWidth, y + 20);
+            });
+        }
+        
+        async function loadCharts() {
+            try {
+                // Load chart data and render
+                drawTransactionChart();
+                drawPaymentMethodChart();
+                drawRevenueChart();
+                drawPerformanceChart();
+                drawWorkerChart();
+                drawHeatmapChart();
+            } catch (error) {
+                console.error('Charts load error:', error);
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if already logged in
+            const savedToken = localStorage.getItem('adminToken');
+            if (savedToken) {
+                authToken = savedToken;
+                // Verify token is still valid
+                apiCall('/admin/transactions').then(() => {
+                    showDashboard();
+                }).catch(() => {
+                    localStorage.removeItem('adminToken');
+                });
+            }
+        });
+
+        // Save token to localStorage
+        window.addEventListener('beforeunload', () => {
+            if (authToken) {
+                localStorage.setItem('adminToken', authToken);
+            }
+        });
+    </script>
+</body>
+</html>

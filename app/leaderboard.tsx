@@ -1,13 +1,22 @@
-import React, { useState, useEffect } from 'react'
-import { View, Text, FlatList, StyleSheet } from 'react-native'
+import { MaterialIcons } from '@expo/vector-icons'
+import { router } from 'expo-router'
+import React, { useCallback, useEffect, useState } from 'react'
+import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { supabase, Worker } from '../lib/supabase'
 
 export default function LeaderboardScreen() {
   const [workers, setWorkers] = useState<Worker[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     fetchLeaderboard()
+  }, [])
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await fetchLeaderboard()
+    setRefreshing(false)
   }, [])
 
   const fetchLeaderboard = async () => {
@@ -43,9 +52,16 @@ export default function LeaderboardScreen() {
     </View>
   )
 
+
   if (loading) {
     return (
       <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <MaterialIcons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Leaderboard</Text>
+        </View>
         <Text>Loading leaderboard...</Text>
       </View>
     )
@@ -53,12 +69,26 @@ export default function LeaderboardScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <MaterialIcons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Leaderboard</Text>
+      </View>
       <Text style={styles.title}>🏆 Top Earners</Text>
       <FlatList
         data={workers}
         renderItem={renderWorker}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#007AFF"
+            colors={['#007AFF']}
+          />
+        }
       />
     </View>
   )
@@ -68,8 +98,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    paddingTop: 50,
+    paddingTop: 0,
+    paddingHorizontal: 0,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingBottom: 16,
     paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: '#fff',
+    justifyContent: 'flex-start',
+    gap: 12,
+  },
+  backButton: {
+    padding: 4,
+    marginRight: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
   },
   title: {
     fontSize: 24,

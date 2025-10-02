@@ -20,6 +20,7 @@ function ScannerContent() {
   }, [])
 
   const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
+    if (scanned) return // Prevent multiple scans
     setScanned(true)
     
     // Extract worker ID from QR code data
@@ -28,8 +29,15 @@ function ScannerContent() {
       const workerId = workerIdMatch[1]
       router.push(`/tip/${workerId}`)
     } else {
-      Alert.alert('Invalid QR Code', 'This is not a valid TTip QR code')
-      setScanned(false)
+      // Handle any other QR code - show content and allow user to decide
+      Alert.alert(
+        'QR Code Scanned', 
+        `Content: ${data}`,
+        [
+          { text: 'Scan Again', onPress: () => setTimeout(() => setScanned(false), 500) },
+          { text: 'Close', onPress: () => router.back() }
+        ]
+      )
     }
   }
 

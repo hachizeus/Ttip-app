@@ -4,14 +4,13 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Modal,
   FlatList,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../lib/theme-context';
 import { NotificationData, getNotifications, markAsRead } from '../lib/notifications';
-import ModalOverlay from './ModalOverlay';
 
 interface NotificationsModalProps {
   visible: boolean;
@@ -22,16 +21,50 @@ export default function NotificationsModal({ visible, onClose }: NotificationsMo
   const { colors } = useTheme();
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const scaleAnim = useState(new Animated.Value(0))[0];
+  const opacityAnim = useState(new Animated.Value(0))[0];
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
 
   useEffect(() => {
     if (visible) {
-      loadNotifications();
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 300,
+          friction: 20,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(scaleAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
   }, [visible]);
 
   const loadNotifications = async () => {
+    setLoading(true);
     const data = await getNotifications();
     setNotifications(data);
+    setLoading(false);
   };
 
   const onRefresh = async () => {
@@ -89,73 +122,105 @@ export default function NotificationsModal({ visible, onClose }: NotificationsMo
     </TouchableOpacity>
   );
 
-  return (
-    <Modal visible={visible} transparent animationType="slide">
-      <ModalOverlay visible={visible}>
-        <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.headerTitle, { color: colors.text }]}>
-                Notifications
-              </Text>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <MaterialIcons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
+  if (!visible) return null;
 
-            <FlatList
-              data={notifications}
-              renderItem={renderNotification}
-              keyExtractor={(item) => item.id}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-              }
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <MaterialIcons name="notifications-none" size={64} color={colors.textSecondary} />
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                    No notifications yet
-                  </Text>
-                </View>
-              }
-              contentContainerStyle={notifications.length === 0 ? styles.emptyList : undefined}
-            />
-          </View>
+  return (
+    <Animated.View 
+      style={[
+        styles.dropdownContainer,
+        {
+          opacity: opacityAnim,
+          transform: [{ scale: scaleAnim }],
+        }
+      ]}
+    >
+      <View style={[styles.notch, { backgroundColor: colors.background, borderColor: colors.border }]} />
+      <View style={[styles.dropdownContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Notifications
+          </Text>
         </View>
-      </ModalOverlay>
-    </Modal>
+
+        <FlatList
+          data={notifications}
+          renderItem={renderNotification}
+          keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListEmptyComponent={
+            loading ? (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  Loading...
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <MaterialIcons name="notifications-none" size={48} color={colors.textSecondary} />
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  No notifications yet
+                </Text>
+              </View>
+            )
+          }
+          contentContainerStyle={notifications.length === 0 ? styles.emptyList : undefined}
+          style={styles.flatList}
+        />
+      </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingTop: 100,
+  dropdownContainer: {
+    position: 'absolute',
+    top: 98,
+    right: 36,
+    width: 320,
+    maxHeight: 400,
+    zIndex: 1200,
   },
-  modalContent: {
-    height: '85%',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+  notch: {
+    position: 'absolute',
+    top: -8,
+    right: 12,
+    width: 16,
+    height: 16,
+    transform: [{ rotate: '45deg' }],
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    zIndex: 1201,
+  },
+  dropdownContent: {
+    borderRadius: 12,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  flatList: {
+    maxHeight: 300,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
     borderBottomWidth: 1,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
   },
-  closeButton: {
-    padding: 4,
-  },
+
   notificationItem: {
-    padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 6,
+    padding: 12,
+    marginHorizontal: 12,
+    marginVertical: 4,
     borderRadius: 8,
     position: 'relative',
   },
@@ -198,10 +263,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   emptyContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 40,
   },
   emptyText: {
     fontSize: 16,

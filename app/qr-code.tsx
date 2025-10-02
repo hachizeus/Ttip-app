@@ -1,17 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, Alert, TouchableOpacity, ScrollView, Modal } from 'react-native'
+import { MaterialIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import React, { useEffect, useRef, useState } from 'react'
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import QRCode from 'react-native-qrcode-svg'
 import { getCurrentUser } from '../lib/auth'
 import { supabase } from '../lib/supabase'
-import QRCode from 'react-native-qrcode-svg'
-import { MaterialIcons } from '@expo/vector-icons'
-import { useTheme, ThemeProvider } from '../lib/theme-context'
-import * as MediaLibrary from 'expo-media-library'
-import * as FileSystem from 'expo-file-system'
-import ViewShot from 'react-native-view-shot'
-import ModalOverlay from '../components/ModalOverlay'
+import { useTheme } from '../lib/theme-context'
 
-function QRCodeContent() {
+import * as MediaLibrary from 'expo-media-library'
+import ViewShot from 'react-native-view-shot'
+import GlobalModal from '../components/GlobalModal'
+import LoadingDots from '../components/LoadingDots'
+
+export default function QRCodeScreen() {
   const { colors } = useTheme()
   const [workerID, setWorkerID] = useState('')
   const [loading, setLoading] = useState(true)
@@ -74,22 +75,25 @@ function QRCodeContent() {
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.loadingText, { color: colors.text }]}>Loading...</Text>
+        <LoadingDots size={12} />
       </View>
     )
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.background }]}>
-        <View style={styles.headerContent}>
-          <MaterialIcons name="qr-code" size={32} color={colors.primary} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}> 
+      <View style={[styles.header, { backgroundColor: colors.background }]}> 
+        <View style={styles.headerContent}> 
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <MaterialIcons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          {/* Removed QR code icon next to title */}
           <Text style={[styles.headerTitle, { color: colors.text }]}>My QR Code</Text>
-          <TouchableOpacity onPress={downloadQR} style={styles.downloadButton}>
+          <TouchableOpacity onPress={downloadQR} style={styles.downloadButton}> 
             <MaterialIcons name="download" size={24} color={colors.accent} />
           </TouchableOpacity>
         </View>
-        <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+        <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}> 
           Customers can scan this code to tip you
         </Text>
       </View>
@@ -97,17 +101,17 @@ function QRCodeContent() {
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {workerID && (
           <View style={[styles.qrContainer, { backgroundColor: colors.background }]}>
-            <View style={[styles.qrWrapper, { backgroundColor: '#ffffff' }]}>
+            <View style={[styles.qrWrapper, { backgroundColor: colors.card }]}>
               <ViewShot ref={qrRef} options={{ format: 'png', quality: 1.0 }}>
-                <View style={styles.qrDownloadContainer}>
+                <View style={[styles.qrDownloadContainer, { backgroundColor: colors.card }]}>
                   <QRCode
                     value={`${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-app.onrender.com'}/tip/${workerID}?ref=qrpage&worker=${workerID}&timestamp=${Date.now()}&data=complex`}
                     size={220}
-                    backgroundColor="#ffffff"
-                    color="#000000"
+                    backgroundColor={colors.card}
+                    color={colors.text}
                     logo={require('../assets/images/mylogo.png')}
                     logoSize={50}
-                    logoBackgroundColor="#ffffff"
+                    logoBackgroundColor={colors.card}
                     logoMargin={4}
                     logoBorderRadius={25}
                     ecl="M"
@@ -158,29 +162,17 @@ function QRCodeContent() {
         </View>
       </ScrollView>
 
-      <Modal visible={showAlert} transparent animationType="fade">
-        <ModalOverlay visible={showAlert}>
-          <View style={styles.alertContainer}>
-            <View style={[styles.alertContent, { backgroundColor: colors.background }]}>
-              <MaterialIcons 
-                name={alertType === 'success' ? 'check-circle' : 'error'} 
-                size={48} 
-                color={alertType === 'success' ? '#00C851' : '#ff4444'} 
-              />
-              <Text style={[styles.alertMessage, { color: colors.text }]}>{alertMessage}</Text>
-            </View>
-          </View>
-        </ModalOverlay>
-      </Modal>
+      <GlobalModal visible={showAlert} onClose={() => setShowAlert(false)}>
+        <View style={[styles.alertContent, { backgroundColor: colors.background }]}>
+          <MaterialIcons 
+            name={alertType === 'success' ? 'check-circle' : 'error'} 
+            size={48} 
+            color={alertType === 'success' ? '#00C851' : colors.error || '#ff4444'} 
+          />
+          <Text style={[styles.alertMessage, { color: colors.text }]}>{alertMessage}</Text>
+        </View>
+      </GlobalModal>
     </View>
-  )
-}
-
-export default function QRCodeScreen() {
-  return (
-    <ThemeProvider>
-      <QRCodeContent />
-    </ThemeProvider>
   )
 }
 
@@ -192,6 +184,7 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 20,
     paddingHorizontal: 20,
+    // No borderBottom for QR header
   },
   headerContent: {
     flexDirection: 'row',
@@ -230,12 +223,10 @@ const styles = StyleSheet.create({
   },
   qrWrapper: {
     padding: 16,
-    backgroundColor: '#fff',
     borderRadius: 16,
     marginBottom: 16,
   },
   qrDownloadContainer: {
-    backgroundColor: '#ffffff',
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',

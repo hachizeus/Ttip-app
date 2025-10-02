@@ -1,56 +1,143 @@
-import React from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native'
-import { router } from 'expo-router'
 import { MaterialIcons } from '@expo/vector-icons'
-import { useTheme, ThemeProvider } from '../lib/theme-context'
+import { router } from 'expo-router'
+import React, { useEffect, useRef, useState } from 'react'
+import { Dimensions, Image, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
-const { width, height } = Dimensions.get('window')
+const { width, height } = Dimensions.get('screen')
+
+const images = [
+  require('../assets/images/woman-service.jpg'),
+  require('../assets/images/bartender-working-club.jpg'),
+  require('../assets/images/man-truck.jpg'),
+  require('../assets/images/harvest.jpg'),
+  require('../assets/images/woman-service.jpg'), // Duplicate for seamless loop
+]
 
 function WelcomeContent() {
-  const { colors } = useTheme()
+  const scrollRef = useRef<ScrollView>(null)
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [imagesLoaded, setImagesLoaded] = useState(false)
+  const insets = useSafeAreaInsets()
+
+  useEffect(() => {
+    const cacheImages = async () => {
+      try {
+        // Check if images are already cached
+        const cached = await AsyncStorage.getItem('welcomeImagesCached')
+        if (cached === 'true') {
+          setImagesLoaded(true)
+          return
+        }
+        
+        // Preload and cache all images
+        const prefetchPromises = images.map(image => 
+          Image.prefetch(Image.resolveAssetSource(image).uri)
+        )
+        
+        await Promise.all(prefetchPromises)
+        await AsyncStorage.setItem('welcomeImagesCached', 'true')
+        setImagesLoaded(true)
+      } catch (error) {
+        // Fallback: just load first image
+        Image.prefetch(Image.resolveAssetSource(images[0]).uri).then(() => {
+          setImagesLoaded(true)
+        })
+      }
+    }
+    
+    cacheImages()
+  }, [])
+
+  // Removed image preloading effect
+
+  useEffect(() => {
+    // Delay auto-scroll to allow images to load
+    const timeout = setTimeout(() => {
+      const interval = setInterval(() => {
+        setCurrentIndex(prev => {
+          const nextIndex = prev + 1
+          if (nextIndex >= images.length - 1) {
+            scrollRef.current?.scrollTo({ x: nextIndex * width, animated: true })
+            setTimeout(() => {
+              scrollRef.current?.scrollTo({ x: 0, animated: false })
+            }, 500)
+            return 0
+          } else {
+            scrollRef.current?.scrollTo({ x: nextIndex * width, animated: true })
+            return nextIndex
+          }
+        })
+      }, 5000) // Reduced from 7000 to 5000
+      return () => clearInterval(interval)
+    }, 2000) // Wait 2 seconds before starting auto-scroll
+    
+    return () => clearTimeout(timeout)
+  }, [])
+
+  // Removed loading placeholder
 
   return (
     <View style={styles.container}>
-      <View style={styles.backgroundGradient} />
-      
-      <View style={styles.content}>
-        <View style={styles.logoContainer}>
-          <View style={styles.logoCircle}>
-            <MaterialIcons name="attach-money" size={60} color="#fff" />
+      <StatusBar hidden={true} />
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        style={styles.carousel}
+        contentContainerStyle={{ flexGrow: 1 }}
+        decelerationRate="fast"
+        snapToInterval={width}
+        snapToAlignment="start"
+        scrollEventThrottle={16}
+      >
+        {images.map((image, index) => (
+          <View key={index} style={{ width: width, height: height, backgroundColor: '#667eea' }}>
+            <Image
+              source={image}
+              style={styles.carouselImage}
+              resizeMode="cover"
+              defaultSource={require('../assets/images/mylogo.png')}
+              cache="force-cache"
+            />
           </View>
-          <Text style={styles.brandName}>TTip</Text>
-          <Text style={styles.tagline}>Digital Tipping Platform</Text>
+        ))}
+      </ScrollView>
+      <View style={styles.overlay}>
+        <View style={styles.topSection}>
+          <Image source={require('../assets/images/mylogo.png')} style={styles.logo} />
         </View>
-        
-        <View style={styles.features}>
-          <View style={styles.feature}>
-            <MaterialIcons name="qr-code-scanner" size={24} color="#007AFF" />
-            <Text style={styles.featureText}>Scan & Tip Instantly</Text>
+        <View style={styles.bottomSection}>
+          <Text style={styles.tagline}>RECEIVE TIPS INSTANTLY</Text>
+          <Text style={styles.subtitle}>DIGITALLY WITH SECURE MOBILE PAYMENTS</Text>
+          <View style={styles.dotsContainer}>
+            {images.slice(0, -1).map((_, index) => (
+              <View 
+                key={index} 
+                style={[
+                  styles.dot, 
+                  { backgroundColor: currentIndex === index ? '#fff' : 'rgba(255,255,255,0.4)' }
+                ]} 
+              />
+            ))}
           </View>
-          <View style={styles.feature}>
-            <MaterialIcons name="security" size={24} color="#007AFF" />
-            <Text style={styles.featureText}>Secure Payments</Text>
-          </View>
-          <View style={styles.feature}>
-            <MaterialIcons name="trending-up" size={24} color="#007AFF" />
-            <Text style={styles.featureText}>Track Earnings</Text>
-          </View>
-        </View>
-        
-        <View style={styles.buttons}>
           <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => router.push('/signin')}
-          >
-            <Text style={styles.primaryButtonText}>Sign In</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.secondaryButton}
+            style={styles.signInButton}
             onPress={() => router.push('/signup')}
           >
-            <Text style={styles.secondaryButtonText}>Create Account</Text>
+            <Text style={styles.signInText}>SIGN UP</Text>
+            <MaterialIcons name="arrow-forward" size={20} color="#fff" style={styles.arrow} />
           </TouchableOpacity>
+          <Text style={styles.signUpText}>
+            ALREADY HAVE AN ACCOUNT? 
+            <Text style={styles.signUpLink} onPress={() => router.push('/signin')}>SIGN IN</Text>
+          </Text>
+          <View style={styles.developerCredit}>
+            <Image source={require('../assets/images/mylogo.png')} style={styles.creditLogo} />
+            <Text style={styles.creditText}>Developed by ElitJohns Digital Services</Text>
+          </View>
         </View>
       </View>
     </View>
@@ -58,112 +145,122 @@ function WelcomeContent() {
 }
 
 export default function WelcomeScreen() {
-  return (
-    <ThemeProvider>
-      <WelcomeContent />
-    </ThemeProvider>
-  )
+  return <WelcomeContent />
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
   },
-  backgroundGradient: {
+  carousel: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: height * 0.6,
-    backgroundColor: '#1a1a1a',
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
+    bottom: 0,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 80,
-    paddingBottom: 40,
+  carouselImage: {
+    width: width,
+    height: height,
+    resizeMode: 'cover',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
-  logoContainer: {
+  topSection: {
     alignItems: 'center',
-    marginTop: 60,
+    paddingTop: 60,
   },
-  logoCircle: {
+  logo: {
     width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    height: 40,
+    resizeMode: 'contain',
   },
-  brandName: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
+  bottomSection: {
+    paddingHorizontal: 24,
+    paddingBottom: 60,
+    alignItems: 'center',
   },
   tagline: {
+    color: '#fff',
     fontSize: 16,
-    color: '#999',
+    fontWeight: '700',
     textAlign: 'center',
+    marginBottom: 8,
+    letterSpacing: 1,
   },
-  features: {
-    paddingHorizontal: 20,
+  subtitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 30,
+    letterSpacing: 1,
   },
-  feature: {
+  dotsContainer: {
+    flexDirection: 'row',
+    marginBottom: 40,
+    gap: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  signInButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 16,
+    paddingHorizontal: 80,
+    borderRadius: 25,
+    marginBottom: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
+    justifyContent: 'space-between',
   },
-  featureText: {
-    fontSize: 16,
+  signInText: {
     color: '#fff',
-    marginLeft: 16,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  signUpText: {
+    color: '#fff',
+    fontSize: 12,
+    textAlign: 'center',
     fontWeight: '500',
   },
-  buttons: {
-    paddingHorizontal: 20,
+  signUpLink: {
+    textDecorationLine: 'underline',
+    fontWeight: '700',
+    color: '#FF6B00',
   },
-  primaryButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 18,
-    borderRadius: 16,
+  arrow: {
+    position: 'absolute',
+    right: 20,
+  },
+  developerCredit: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    justifyContent: 'center',
+    marginTop: 30,
+    gap: 8,
   },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+  creditLogo: {
+    width: 30,
+    height: 10,
+    resizeMode: 'contain',
   },
-  secondaryButton: {
-    borderWidth: 2,
-    borderColor: '#333',
-    paddingVertical: 18,
-    borderRadius: 16,
-    alignItems: 'center',
+  creditText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
   },
-  secondaryButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+  imagePlaceholder: {
+    backgroundColor: '#1a1a1a',
   },
 })

@@ -1,16 +1,22 @@
 import axios from 'axios';
+import { configDotenv } from 'dotenv';
+
+// Load environment variables
+configDotenv();
 
 // Environment variables are automatically available on Render
 const baseURL = process.env.BASE_URL || 'https://sandbox.safaricom.co.ke';
 const consumerKey = process.env.CONSUMER_KEY;
 const consumerSecret = process.env.CONSUMER_SECRET;
 
-console.log('Daraja env check:', {
-    hasBaseURL: !!baseURL,
-    hasConsumerKey: !!consumerKey,
-    hasConsumerSecret: !!consumerSecret,
-    consumerKeyPreview: consumerKey ? consumerKey.substring(0, 10) + '...' : 'missing'
-});
+// Only log in development
+if (process.env.NODE_ENV === 'development') {
+    console.log('Daraja env check:', {
+        hasBaseURL: !!baseURL,
+        hasConsumerKey: !!consumerKey,
+        hasConsumerSecret: !!consumerSecret
+    });
+}
 
 export const getAccessToken = async () => {
     const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');

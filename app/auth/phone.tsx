@@ -1,25 +1,22 @@
 import React, { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { router } from 'expo-router'
 import { sendOTP } from '../../lib/auth'
-import { formatPhoneForAPI, validateKenyanPhone } from '../../lib/phone-utils'
-import { supabase } from '../../lib/supabase'
 
 export default function PhoneScreen() {
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleSendOTP = async () => {
-    if (!validateKenyanPhone(phone)) {
+    if (phone.length !== 10 || !phone.startsWith('0')) {
       Alert.alert('Error', 'Enter valid phone number (0712345678)')
       return
     }
 
     setLoading(true)
     try {
-      const apiPhone = formatPhoneForAPI(phone)
-      await sendOTP(apiPhone)
-      router.push({ pathname: '/auth/otp', params: { phone: apiPhone } })
+      await sendOTP(phone)
+      router.push({ pathname: '/auth/otp', params: { phone } })
     } catch (error) {
       Alert.alert('Error', 'Failed to send OTP. Try again.')
     } finally {
@@ -28,7 +25,7 @@ export default function PhoneScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}>
       <Text style={styles.title}>Enter Phone Number</Text>
       <Text style={styles.subtitle}>We'll send you a verification code</Text>
       
@@ -37,8 +34,6 @@ export default function PhoneScreen() {
         placeholder="0712345678"
         value={phone}
         onChangeText={setPhone}
-        keyboardType="phone-pad"
-        maxLength={10}
       />
       
       <TouchableOpacity
@@ -50,7 +45,7 @@ export default function PhoneScreen() {
           {loading ? 'Sending...' : 'Send OTP'}
         </Text>
       </TouchableOpacity>
-    </ScrollView>
+    </View>
   )
 }
 
@@ -58,12 +53,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-  },
-  content: {
     paddingTop: 100,
     paddingHorizontal: 20,
     justifyContent: 'center',
-    flexGrow: 1,
   },
   title: {
     fontSize: 28,
@@ -81,9 +73,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     padding: 15,
-    borderRadius: 8,
     fontSize: 18,
-    textAlign: 'center',
     marginBottom: 30,
   },
   button: {

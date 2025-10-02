@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal } from 'react-native'
+import { MaterialIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import React, { useCallback, useEffect, useState } from 'react'
+import { Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { getCurrentUser } from '../lib/auth'
 import { supabase } from '../lib/supabase'
-import { MaterialIcons } from '@expo/vector-icons'
-import { useTheme, ThemeProvider } from '../lib/theme-context'
-import { initiateMpesaPayment } from '../lib/mpesa'
-import ModalOverlay from '../components/ModalOverlay'
-import { fonts, fontWeights } from '../lib/fonts'
+import { useTheme } from '../lib/theme-context'
 
-function SubscriptionContent() {
+import GlobalModal from '../components/GlobalModal'
+import { fonts, fontWeights } from '../lib/fonts'
+import { NetworkManager } from '../lib/network-manager'
+import { OfflinePayments } from '../lib/offline-payments'
+import { clearLimitedMode } from '../lib/subscription-utils'
+
+export default function SubscriptionScreen() {
   const { colors } = useTheme()
   const [subscription, setSubscription] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -20,9 +23,16 @@ function SubscriptionContent() {
   const [showPaymentStatus, setShowPaymentStatus] = useState(false)
   const [paymentStatusMessage, setPaymentStatusMessage] = useState('')
   const [checkoutRequestID, setCheckoutRequestID] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     loadSubscription()
+  }, [])
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await loadSubscription()
+    setRefreshing(false)
   }, [])
 
   const loadSubscription = async () => {
@@ -85,7 +95,7 @@ function SubscriptionContent() {
     
     const poll = async () => {
       try {
-        const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-app.onrender.com'
+        const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-backend.onrender.com'
         const response = await fetch(`${backendUrl}/api/subscription-status/${checkoutID}`)
         
         const result = await response.json()
@@ -93,8 +103,12 @@ function SubscriptionContent() {
         if (result.status === 'success' || result.status === 'completed') {
           setPaymentStatusMessage('Payment successful! Your subscription has been updated.')
           
-          // Force refresh subscription data
+          // Clear limited mode and refresh subscription data
           setTimeout(async () => {
+            const phone = await getCurrentUser()
+            if (phone) {
+              await clearLimitedMode(phone)
+            }
             await loadSubscription()
             setShowPaymentStatus(false)
             setPaymentStatusMessage('')
@@ -139,54 +153,46 @@ function SubscriptionContent() {
     
     setPaymentLoading(true)
     try {
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-app.onrender.com'
-      console.log('Making payment request to:', `${backendUrl}/api/subscription-payment`)
+      const isOnline = NetworkManager.getIsOnline()
       
-      const response = await fetch(`${backendUrl}/api/subscription-payment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          phone: userPhone, 
-          amount: selectedPlan.amount,
-          plan: selectedPlan.name.toLowerCase().replace(' ', '_')
-        })
-      })
-      
-      console.log('Response status:', response.status)
-      
-      if (!response.ok) {
-        if (response.status === 502) {
-          Alert.alert('Service Unavailable', 'Payment service is temporarily unavailable. Please try again later.')
-        } else if (response.status === 404) {
-          Alert.alert('Service Error', 'Payment endpoint not found. Please contact support.')
-        } else {
-          Alert.alert('Error', `Server error: ${response.status}. Please try again.`)
-        }
-        return
-      }
-      
-      const text = await response.text()
-      console.log('Response text:', text)
-      
-      let result
-      try {
-        result = JSON.parse(text)
-      } catch (parseError) {
-        console.error('JSON parse error:', parseError, 'Response text:', text)
-        Alert.alert('Error', 'Payment service unavailable. Please try again later.')
-        return
-      }
-      
-      if (result.success && result.checkoutRequestID) {
-        setShowPaymentModal(false)
-        setCheckoutRequestID(result.checkoutRequestID)
-        setPaymentStatusMessage('Payment initiated. Please complete on your phone...')
-        setShowPaymentStatus(true)
+      if (isOnline) {
+        // Online payment
+        const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-backend.onrender.com'
+        console.log('Making payment request to:', `${backendUrl}/api/subscription-payment`)
         
-        // Start polling for payment status
-        pollPaymentStatus(result.checkoutRequestID)
+        const response = await fetch(`${backendUrl}/api/subscription-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            phone: userPhone, 
+            amount: selectedPlan.amount,
+            plan: selectedPlan.name.toLowerCase().replace(' ', '_')
+          })
+        })
+        
+        if (response.ok) {
+          const result = await response.json()
+          if (result.success && result.checkoutRequestID) {
+            setShowPaymentModal(false)
+            setCheckoutRequestID(result.checkoutRequestID)
+            setPaymentStatusMessage('Payment initiated. Please complete on your phone...')
+            setShowPaymentStatus(true)
+            pollPaymentStatus(result.checkoutRequestID)
+          } else {
+            Alert.alert('Payment Failed', result.error || 'Could not initiate payment')
+          }
+        } else {
+          Alert.alert('Error', 'Payment service unavailable. Please try again later.')
+        }
       } else {
-        Alert.alert('Payment Failed', result.error || 'Could not initiate payment')
+        // Offline payment
+        const result = await OfflinePayments.processSubscriptionOffline(
+          userPhone, 
+          selectedPlan.amount, 
+          selectedPlan.name
+        )
+        setShowPaymentModal(false)
+        Alert.alert('Offline Mode', result.message + '\n\nYour subscription will be activated when internet connection is restored.')
       }
     } catch (error) {
       console.error('Payment error:', error)
@@ -197,25 +203,35 @@ function SubscriptionContent() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}> 
+      {/* Header with Back Arrow */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <MaterialIcons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Subscription</Text>
+        <View style={styles.headerSpacer} />
+      </View>
       {/* Fixed Current Plan Section */}
-      <View style={[styles.fixedSection, { backgroundColor: colors.background }]}>
+      <View style={[styles.fixedSection, { backgroundColor: colors.background }]}> 
         {subscription && (
-          <View style={[styles.currentPlan, { backgroundColor: colors.background }]}>
-            <View style={styles.currentPlanHeader}>
+          <View style={[styles.currentPlan, { backgroundColor: colors.background }]}> 
+            <View style={styles.currentPlanHeader}> 
               <MaterialIcons name="diamond" size={24} color={colors.accent} />
               <Text style={[styles.currentPlanTitle, { color: colors.text }]}>Current Plan</Text>
             </View>
-            <Text style={[styles.planName, { color: colors.primary }]}>
-              {subscription.subscription_plan === 'lite_plan' ? 'Lite Plan' : 
+            <Text style={[styles.planName, { color: colors.primary }]}> 
+              {subscription.subscription_plan === 'lite' ? 'Lite Plan' : 
+               subscription.subscription_plan === 'pro' ? 'Pro Plan' :
+               subscription.subscription_plan === 'lite_plan' ? 'Lite Plan' : 
                subscription.subscription_plan === 'pro_plan' ? 'Pro Plan' :
                subscription.subscription_plan === 'free' ? 'Free Trial' :
-               subscription.subscription_plan}
+               subscription.subscription_plan || 'Free Trial'}
             </Text>
             {subscription.subscription_expiry && (
-              <View style={styles.expiryContainer}>
+              <View style={styles.expiryContainer}> 
                 <MaterialIcons name="schedule" size={16} color={colors.textSecondary} />
-                <Text style={[styles.expiryText, { color: colors.textSecondary }]}>
+                <Text style={[styles.expiryText, { color: colors.textSecondary }]}> 
                   Expires: {new Date(subscription.subscription_expiry).toLocaleDateString()}
                 </Text>
               </View>
@@ -225,7 +241,18 @@ function SubscriptionContent() {
       </View>
 
       {/* Scrollable Content */}
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Available Plans</Text>
 
         {plans.map((plan, index) => (
@@ -248,74 +275,90 @@ function SubscriptionContent() {
               ))}
             </View>
             
-            {subscription?.subscription_plan === 'lite_plan' && plan.name === 'Lite Plan' ? (
-              <View style={[styles.currentBadge, { backgroundColor: '#00C851' }]}>
-                <Text style={styles.currentBadgeText}>Current Plan</Text>
-              </View>
-            ) : subscription?.subscription_plan === 'pro_plan' && plan.name === 'Pro Plan' ? (
-              <View style={[styles.currentBadge, { backgroundColor: '#00C851' }]}>
-                <Text style={styles.currentBadgeText}>Current Plan</Text>
-              </View>
-            ) : plan.highlight ? (
-              <View style={[styles.currentBadge, { backgroundColor: '#666' }]}>
-                <Text style={styles.currentBadgeText}>Trial Ended</Text>
-              </View>
-            ) : (
-              <TouchableOpacity 
-                style={[styles.subscribeButton, { backgroundColor: colors.accent }]}
-                onPress={() => handlePlanSelect(plan)}
-              >
-                <Text style={styles.subscribeButtonText}>Subscribe</Text>
-              </TouchableOpacity>
-            )}
+            {(() => {
+              const now = new Date()
+              const isExpired = subscription?.subscription_expiry ? now > new Date(subscription.subscription_expiry) : true
+              const isCurrentPlan = (
+                ((subscription?.subscription_plan === 'lite' || subscription?.subscription_plan === 'lite_plan') && plan.name === 'Lite Plan') ||
+                ((subscription?.subscription_plan === 'pro' || subscription?.subscription_plan === 'pro_plan') && plan.name === 'Pro Plan')
+              )
+              
+              if (isCurrentPlan && !isExpired) {
+                return (
+                  <View style={[styles.currentBadge, { backgroundColor: '#00C851' }]}>
+                    <Text style={styles.currentBadgeText}>Current Plan</Text>
+                  </View>
+                )
+              } else if (isCurrentPlan && isExpired) {
+                return (
+                  <TouchableOpacity 
+                    style={[styles.subscribeButton, { backgroundColor: colors.accent }]}
+                    onPress={() => handlePlanSelect(plan)}
+                  >
+                    <Text style={styles.subscribeButtonText}>Subscribe</Text>
+                  </TouchableOpacity>
+                )
+              } else if (plan.highlight) {
+                return (
+                  <View style={[styles.currentBadge, { backgroundColor: '#666' }]}>
+                    <Text style={styles.currentBadgeText}>Trial Ended</Text>
+                  </View>
+                )
+              } else {
+                return (
+                  <TouchableOpacity 
+                    style={[styles.subscribeButton, { backgroundColor: colors.accent }]}
+                    onPress={() => handlePlanSelect(plan)}
+                  >
+                    <Text style={styles.subscribeButtonText}>Subscribe</Text>
+                  </TouchableOpacity>
+                )
+              }
+            })()}
           </View>
         ))}
       </ScrollView>
 
-      <Modal visible={showPaymentModal} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.paymentModalContainer}>
-            <View style={[styles.paymentModalContent, { backgroundColor: colors.background }]}>
-              <View style={[styles.paymentModalHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.paymentModalTitle, { color: colors.text }]}>Confirm Payment</Text>
-                <TouchableOpacity onPress={() => setShowPaymentModal(false)} style={styles.paymentCloseButton}>
-                  <MaterialIcons name="close" size={24} color={colors.text} />
-                </TouchableOpacity>
+      <GlobalModal visible={showPaymentModal} onClose={() => setShowPaymentModal(false)}>
+        <View style={[styles.paymentModalContent, { backgroundColor: colors.background }]}>
+          <View style={[styles.paymentModalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.paymentModalTitle, { color: colors.text }]}>Confirm Payment</Text>
+            <TouchableOpacity onPress={() => setShowPaymentModal(false)} style={styles.paymentCloseButton}>
+              <MaterialIcons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.paymentModalBody}>
+            {selectedPlan && (
+              <View style={[styles.planSummary, { backgroundColor: colors.background }]}>
+                <Text style={[styles.planSummaryName, { color: colors.text }]}>{selectedPlan.name}</Text>
+                <Text style={[styles.planSummaryAmount, { color: colors.primary }]}>KSh {selectedPlan.amount}</Text>
+                <Text style={[styles.planSummaryPhone, { color: colors.textSecondary }]}>From: {userPhone}</Text>
               </View>
+            )}
+            
+            <View style={styles.paymentButtons}>
+              <TouchableOpacity
+                style={[styles.paymentButton, styles.cancelPaymentButton, { borderColor: colors.border }]}
+                onPress={() => setShowPaymentModal(false)}
+                disabled={paymentLoading}
+              >
+                <Text style={[styles.cancelPaymentText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
               
-              <View style={styles.paymentModalBody}>
-                {selectedPlan && (
-                  <View style={[styles.planSummary, { backgroundColor: colors.background }]}>
-                    <Text style={[styles.planSummaryName, { color: colors.text }]}>{selectedPlan.name}</Text>
-                    <Text style={[styles.planSummaryAmount, { color: colors.primary }]}>KSh {selectedPlan.amount}</Text>
-                    <Text style={[styles.planSummaryPhone, { color: colors.textSecondary }]}>From: {userPhone}</Text>
-                  </View>
-                )}
-                
-                <View style={styles.paymentButtons}>
-                  <TouchableOpacity
-                    style={[styles.paymentButton, styles.cancelPaymentButton, { borderColor: colors.border }]}
-                    onPress={() => setShowPaymentModal(false)}
-                    disabled={paymentLoading}
-                  >
-                    <Text style={[styles.cancelPaymentText, { color: colors.text }]}>Cancel</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={[styles.paymentButton, styles.confirmPaymentButton, { backgroundColor: colors.primary }]}
-                    onPress={handlePayment}
-                    disabled={paymentLoading}
-                  >
-                    <Text style={styles.confirmPaymentText}>
-                      {paymentLoading ? 'Processing...' : 'Pay Now'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+              <TouchableOpacity
+                style={[styles.paymentButton, styles.confirmPaymentButton, { backgroundColor: colors.primary }]}
+                onPress={handlePayment}
+                disabled={paymentLoading}
+              >
+                <Text style={styles.confirmPaymentText}>
+                  {paymentLoading ? 'Processing...' : 'Pay Now'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
-      </Modal>
+      </GlobalModal>
 
       <Modal visible={showPaymentStatus} transparent animationType="fade">
         <View style={styles.statusModalBackdrop}>
@@ -331,14 +374,6 @@ function SubscriptionContent() {
   )
 }
 
-export default function SubscriptionScreen() {
-  return (
-    <ThemeProvider>
-      <SubscriptionContent />
-    </ThemeProvider>
-  )
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -351,8 +386,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    // borderBottomWidth: 1,
+    // borderBottomColor: '#f0f0f0',
   },
   backButton: {
     padding: 4,
@@ -367,18 +402,17 @@ const styles = StyleSheet.create({
   fixedSection: {
     paddingHorizontal: 12,
     paddingBottom: 12,
+    marginTop: 60,
     zIndex: 1000,
-    elevation: 5,
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 12,
     paddingTop: 12,
-    paddingBottom: 20,
+    paddingBottom: 120,
   },
   currentPlan: {
-    padding: 20,
+    padding: 5,
     borderRadius: 16,
     marginBottom: 20,
     shadowColor: '#000',

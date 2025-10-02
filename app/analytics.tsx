@@ -1,38 +1,96 @@
-import React, { useState, useEffect } from 'react'
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Dimensions,
-  StatusBar,
-  Platform,
-} from 'react-native'
+  // ...existing code...
 import { router } from 'expo-router'
-import { LineChart } from 'react-native-chart-kit'
+import React, { useEffect, useState } from 'react'
+import {
+    Dimensions,
+    // PanResponder,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native'
+
 import { MaterialIcons } from '@expo/vector-icons'
+import { LineChart } from 'react-native-chart-kit'
+import LoadingDots from '../components/LoadingDots'
 import { getCurrentUser } from '../lib/auth'
 import { supabase } from '../lib/supabase'
-import { useTheme, ThemeProvider } from '../lib/theme-context'
-import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { fonts, fontWeights } from '../lib/fonts'
+import { useTheme } from '../lib/theme-context'
+
+import { fonts } from '../lib/fonts'
 
 const screenWidth = Dimensions.get('window').width
 
-function AnalyticsContent() {
+export default function AnalyticsScreen() {
   const { colors } = useTheme()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedPeriod, setSelectedPeriod] = useState('month')
   const [totalAmount, setTotalAmount] = useState(0)
   const [chartData, setChartData] = useState<any>(null)
-  const [categoryData, setCategoryData] = useState<any[]>([])
+  const [tipHistory, setTipHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showPeriodSelector, setShowPeriodSelector] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     loadAnalytics()
   }, [currentMonth, selectedPeriod])
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true)
+    await loadAnalytics()
+    setRefreshing(false)
+  }, [currentMonth, selectedPeriod])
+
+  const generateChartData = (tips: any[], startDate: Date, endDate: Date) => {
+    const labels = []
+    const data = []
+    
+    if (selectedPeriod === 'month') {
+      // Show last 7 days from today
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date()
+        date.setDate(date.getDate() - i)
+        
+        const dayTips = tips.filter(tip => {
+          const tipDate = new Date(tip.created_at)
+          return tipDate.toDateString() === date.toDateString()
+        })
+        const dayTotal = dayTips.reduce((sum, tip) => sum + (parseFloat(tip.amount) || 0), 0)
+        
+        labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+        data.push(dayTotal)
+      }
+    } else {
+      // Show monthly totals for longer periods
+      const months = selectedPeriod === '3months' ? 3 : selectedPeriod === '6months' ? 6 : 12
+      for (let i = months - 1; i >= 0; i--) {
+        const date = new Date()
+        date.setMonth(date.getMonth() - i)
+        const monthTips = tips.filter(tip => {
+          const tipDate = new Date(tip.created_at)
+          return tipDate.getMonth() === date.getMonth() && tipDate.getFullYear() === date.getFullYear()
+        })
+        const monthTotal = monthTips.reduce((sum, tip) => sum + (parseFloat(tip.amount) || 0), 0)
+        
+        labels.push(date.toLocaleDateString('en-US', { month: 'short' }))
+        data.push(monthTotal)
+      }
+    }
+    
+    setChartData({
+      labels,
+      datasets: [{
+        data: data.length > 0 ? data : [0],
+        color: (opacity = 1) => `rgba(0, 200, 81, ${opacity})`,
+        strokeWidth: 2
+      }]
+    })
+  }
 
   const loadAnalytics = async () => {
     try {
@@ -79,117 +137,18 @@ function AnalyticsContent() {
         const total = tips.reduce((sum, tip) => sum + (parseFloat(tip.amount) || 0), 0)
         setTotalAmount(total)
         generateChartData(tips, startDate, endDate)
-        generateCategoryData(tips, total)
+        setTipHistory(tips.map(tip => ({
+          ...tip,
+          amount: parseFloat(tip.amount) || 0,
+          date: new Date(tip.created_at).toLocaleDateString(),
+          time: new Date(tip.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        })))
       }
     } catch (error) {
       console.error('Error loading analytics:', error)
     } finally {
       setLoading(false)
     }
-  }
-
-  const generateChartData = (tips: any[], startDate: Date, endDate: Date) => {
-    const labels = []
-    const data = []
-    
-    if (selectedPeriod === 'month') {
-      // Weekly intervals for month view
-      const weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4']
-      weeks.forEach((week, index) => {
-        const weekStart = new Date(startDate)
-        weekStart.setDate(weekStart.getDate() + (index * 7))
-        const weekEnd = new Date(weekStart)
-        weekEnd.setDate(weekEnd.getDate() + 6)
-        
-        const weekTips = tips.filter(tip => {
-          const tipDate = new Date(tip.created_at)
-          return tipDate >= weekStart && tipDate <= weekEnd
-        })
-        
-        const weekTotal = weekTips.reduce((sum, tip) => sum + (parseFloat(tip.amount) || 0), 0)
-        labels.push(week)
-        data.push(weekTotal)
-      })
-    } else {
-      // Monthly intervals for 3months, 6months, 1year
-      const current = new Date(startDate)
-      while (current <= endDate) {
-        const monthStr = current.toLocaleDateString('en-US', { month: 'short' })
-        const year = current.getFullYear()
-        const month = current.getMonth()
-        
-        const monthTips = tips.filter(tip => {
-          const tipDate = new Date(tip.created_at)
-          return tipDate.getFullYear() === year && tipDate.getMonth() === month
-        })
-        
-        const monthTotal = monthTips.reduce((sum, tip) => sum + (parseFloat(tip.amount) || 0), 0)
-        labels.push(monthStr)
-        data.push(monthTotal)
-        current.setMonth(current.getMonth() + 1)
-      }
-    }
-
-    setChartData({
-      labels,
-      datasets: [{
-        data,
-        color: (opacity = 1) => `rgba(0, 200, 81, ${opacity})`,
-        strokeWidth: 3
-      }]
-    })
-  }
-
-  const generateCategoryData = (tips: any[], total: number) => {
-    const categories = [
-      { 
-        name: 'SMALL TIPS', 
-        icon: '💰', 
-        color: '#FF6B35',
-        range: [1, 50],
-        amount: 0,
-        percentage: 0
-      },
-      { 
-        name: 'MEDIUM TIPS', 
-        icon: '👥', 
-        color: '#007AFF',
-        range: [51, 200],
-        amount: 0,
-        percentage: 0
-      },
-      { 
-        name: 'LARGE TIPS', 
-        icon: '🎯', 
-        color: '#FF3B82',
-        range: [201, 500],
-        amount: 0,
-        percentage: 0
-      },
-      { 
-        name: 'PREMIUM TIPS', 
-        icon: '💎', 
-        color: '#8B5CF6',
-        range: [501, Infinity],
-        amount: 0,
-        percentage: 0
-      }
-    ]
-
-    tips.forEach(tip => {
-      const amount = parseFloat(tip.amount) || 0
-      categories.forEach(category => {
-        if (amount >= category.range[0] && amount <= category.range[1]) {
-          category.amount += amount
-        }
-      })
-    })
-
-    categories.forEach(category => {
-      category.percentage = total > 0 ? Math.round((category.amount / total) * 100) : 0
-    })
-
-    setCategoryData(categories.filter(c => c.amount > 0))
   }
 
   const getYAxisInterval = (maxValue: number) => {
@@ -210,24 +169,24 @@ function AnalyticsContent() {
     if (selectedPeriod === 'month') {
       return currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()
     }
-    const periodMap = {
+    const periodMap: Record<string, string> = {
       '3months': 'LAST 3 MONTHS',
       '6months': 'LAST 6 MONTHS', 
       '1year': 'LAST 12 MONTHS'
     }
-    return periodMap[selectedPeriod] || 'LAST 6 MONTHS'
+    return periodMap[selectedPeriod as keyof typeof periodMap] || 'LAST 6 MONTHS'
   }
 
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.text }}>Loading analytics...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}> 
+        <LoadingDots size={12} />
       </View>
     )
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}> 
       <StatusBar 
         barStyle={colors.background === '#000000' ? 'light-content' : 'dark-content'} 
         backgroundColor={colors.background}
@@ -241,7 +200,18 @@ function AnalyticsContent() {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
         {/* Period Display */}
         <View style={[styles.totalSection, { backgroundColor: colors.background }]}>
           <TouchableOpacity 
@@ -265,7 +235,12 @@ function AnalyticsContent() {
           <View style={[styles.periodOptions, { 
             backgroundColor: colors.card,
             borderColor: colors.border,
-            shadowColor: colors.text
+            shadowColor: colors.text,
+            position: 'absolute',
+            top: 140,
+            left: 20,
+            right: 20,
+            zIndex: 1000
           }]}>
             {[
               { key: 'month', label: 'This Month' },
@@ -328,13 +303,14 @@ function AnalyticsContent() {
                   fontSize: 11,
                 },
                 formatYLabel: (value) => {
-                  if (value >= 1000) {
-                    return `${Math.round(value / 1000)}K`
+                  const num = typeof value === 'string' ? parseFloat(value) : value;
+                  if (num >= 1000) {
+                    return `${Math.round(num / 1000)}K`;
                   }
-                  return Math.round(value).toString()
+                  return Math.round(num).toString();
                 },
               }}
-              style={[styles.chart, { backgroundColor: colors.background }]}
+              style={styles.chart}
               withHorizontalLabels={true}
               withVerticalLabels={true}
               withInnerLines={false}
@@ -346,43 +322,48 @@ function AnalyticsContent() {
           </View>
         )}
 
-        {/* Categories */}
-        <View style={[styles.categoriesContainer, { backgroundColor: colors.background }]}>
-          {categoryData.map((category, index) => (
-            <View key={index} style={[
-              styles.categoryItem, 
-              { 
-                borderBottomColor: colors.border,
-                backgroundColor: colors.background
-              }
-            ]}>
-              <View style={styles.categoryLeft}>
-                <View style={[styles.categoryIcon, { backgroundColor: category.color }]}>
-                  <Text style={styles.categoryEmoji}>{category.icon}</Text>
+        {/* Tip History */}
+        <View style={[styles.historyContainer, { backgroundColor: colors.background }]}>
+          <Text style={[styles.historyTitle, { color: colors.text }]}>Tip History</Text>
+          {tipHistory.length > 0 ? (
+            tipHistory.map((tip, index) => (
+              <View key={index} style={[
+                styles.tipItem, 
+                { 
+                  borderBottomColor: colors.border,
+                  backgroundColor: colors.background
+                }
+              ]}>
+                <View style={styles.tipLeft}>
+                  <View style={[styles.tipIcon, { backgroundColor: colors.primary }]}>
+                    <MaterialIcons name="payments" size={20} color="#fff" />
+                  </View>
+                  <View style={styles.tipInfo}>
+                    <Text style={[styles.tipAmount, { color: colors.text }]}>{formatAmount(tip.amount)}</Text>
+                    <Text style={[styles.tipDate, { color: colors.textSecondary }]}>{tip.date} at {tip.time}</Text>
+                  </View>
                 </View>
-                <View style={styles.categoryInfo}>
-                  <Text style={[styles.categoryName, { color: colors.text }]}>{category.name}</Text>
-                  <Text style={[styles.categoryAmount, { color: colors.textSecondary }]}>{formatAmount(category.amount)}</Text>
-                </View>
-              </View>
-              <View style={styles.categoryRight}>
-                <Text style={[styles.categoryPercentage, { color: colors.text }]}>{category.percentage}%</Text>
-                <View style={[
-                  styles.percentageBar,
-                  { backgroundColor: colors.border }
-                ]}>
+                <View style={styles.tipRight}>
                   <View style={[
-                    styles.percentageFill,
-                    { 
-                      backgroundColor: category.color,
-                      width: `${category.percentage}%`
-                    }
-                  ]} />
+                    styles.statusBadge,
+                    { backgroundColor: tip.status === 'completed' ? '#00C851' : '#FFC107' }
+                  ]}>
+                    <Text style={styles.statusText}>
+                      {tip.status === 'completed' ? 'Received' : 'Pending'}
+                    </Text>
+                  </View>
                 </View>
               </View>
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="receipt" size={48} color={colors.textSecondary} />
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No tips received yet</Text>
             </View>
-          ))}
+          )}
         </View>
+
+
       </ScrollView>
     </View>
   )
@@ -417,7 +398,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontFamily: fonts.medium,
-    fontWeight: fontWeights.semibold,
+  fontWeight: '600',
     letterSpacing: 1.2,
   },
   totalSection: {
@@ -437,21 +418,19 @@ const styles = StyleSheet.create({
   periodText: {
     fontSize: 13,
     fontFamily: fonts.medium,
-    fontWeight: fontWeights.medium,
+  fontWeight: '500',
     letterSpacing: 0.8,
     marginRight: 6,
   },
   totalAmount: {
     fontSize: 36,
     fontFamily: fonts.light,
-    fontWeight: fontWeights.light,
+  fontWeight: '300',
     letterSpacing: 0.5,
     textAlign: 'center',
   },
   periodOptions: {
-    marginHorizontal: 20,
     borderRadius: 12,
-    marginBottom: 20,
     borderWidth: 1,
     elevation: 4,
     shadowColor: '#000',
@@ -470,88 +449,80 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  chartContainer: {
-    marginBottom: 30,
-    marginLeft: -20,
-    paddingVertical: 10,
-  },
-  chart: {
-    borderRadius: 0,
-  },
-  categoriesContainer: {
+  historyContainer: {
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
-  categoryItem: {
+  historyTitle: {
+    fontSize: 18,
+    fontFamily: fonts.medium,
+  fontWeight: '600',
+    marginBottom: 16,
+  },
+  tipItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 20,
+    paddingVertical: 16,
     paddingHorizontal: 4,
     borderBottomWidth: 0.5,
   },
-  categoryLeft: {
+  tipLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  categoryIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  tipIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    marginRight: 12,
   },
-  categoryEmoji: {
-    fontSize: 22,
-  },
-  categoryInfo: {
+  tipInfo: {
     flex: 1,
   },
-  categoryName: {
+  tipAmount: {
     fontSize: 16,
     fontFamily: fonts.medium,
-    fontWeight: fontWeights.semibold,
+  fontWeight: '600',
     marginBottom: 4,
   },
-  categoryAmount: {
-    fontSize: 14,
-    fontWeight: '400',
+  tipDate: {
+    fontSize: 13,
+    fontFamily: fonts.regular,
+  fontWeight: '400',
   },
-  categoryRight: {
+  tipRight: {
     alignItems: 'flex-end',
-    minWidth: 80,
   },
-  categoryPercentage: {
-    fontSize: 18,
-    fontFamily: fonts.bold,
-    fontWeight: fontWeights.bold,
-    marginBottom: 8,
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  percentageBar: {
-    width: 60,
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
+  statusText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
   },
-  percentageFill: {
-    height: '100%',
-    borderRadius: 2,
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  chartContainer: {
+    paddingHorizontal: 10,
+    paddingVertical: 20,
+  },
+  chart: {
+    borderRadius: 8,
+    backgroundColor: 'transparent',
   },
 })
 
-export default function AnalyticsScreen() {
-  return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <AnalyticsContent />
-      </ThemeProvider>
-    </GestureHandlerRootView>
-  )
-}

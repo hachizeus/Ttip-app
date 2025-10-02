@@ -73,18 +73,23 @@ export async function getUnreadCount(): Promise<number> {
   const phone = await getCurrentUser();
   if (!phone) return 0;
 
-  const { count, error } = await supabase
-    .from('notifications')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', phone)
-    .eq('status', 'unread');
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('user_id', phone)
+      .eq('status', 'unread');
 
-  if (error) {
-    console.error('Error getting unread count:', error);
+    if (error) {
+      console.error('Error getting unread count:', error);
+      return 0;
+    }
+
+    return data?.length || 0;
+  } catch (error) {
+    console.error('Error in getUnreadCount:', error);
     return 0;
   }
-
-  return count || 0;
 }
 
 export async function checkMilestones(newTotal: number, previousTotal: number) {

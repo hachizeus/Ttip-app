@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, ScrollView } from 'react-native'
 import { MaterialIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import QRCode from 'react-native-qrcode-svg'
@@ -56,7 +56,7 @@ export default function WidgetSetupScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.scrollContent}>
       <TouchableOpacity 
         style={styles.backButton} 
         onPress={() => router.back()}
@@ -72,21 +72,27 @@ export default function WidgetSetupScreen() {
         Add your TTip QR code to your home screen for quick access
       </Text>
 
-      <View style={[styles.qrContainer, { backgroundColor: colors.card }]}>
-        <QRCode
-          value={qrData.url}
-          size={200}
-          backgroundColor="white"
-          color="black"
-          logo={require('../assets/images/mylogo.png')}
-          logoSize={40}
-          logoBackgroundColor="white"
-          logoMargin={4}
-          logoBorderRadius={20}
-        />
-        <Text style={[styles.workerInfo, { color: colors.text }]}>
-          {qrData.name} - {qrData.occupation}
-        </Text>
+      <View style={[styles.qrContainer, { backgroundColor: colors.background }]}>
+        <View style={[styles.qrWrapper, { backgroundColor: colors.card }]}>
+          <View style={[styles.qrDownloadContainer, { backgroundColor: colors.card }]}>
+            <QRCode
+              value={qrData.url}
+              size={220}
+              backgroundColor={colors.card}
+              color={colors.text}
+              logo={require('../assets/images/mylogo.png')}
+              logoSize={50}
+              logoBackgroundColor={colors.card}
+              logoMargin={4}
+              logoBorderRadius={25}
+              ecl="M"
+            />
+          </View>
+        </View>
+        <View style={styles.qrInfo}>
+          <Text style={[styles.workerIdLabel, { color: colors.textSecondary }]}>Worker ID</Text>
+          <Text style={[styles.workerId, { color: colors.text }]}>{qrData.workerID || qrData.workerId || 'N/A'}</Text>
+        </View>
       </View>
 
       <TouchableOpacity
@@ -111,15 +117,19 @@ export default function WidgetSetupScreen() {
           4. Drag to your home screen
         </Text>
       </View>
-    </View>
+    </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     padding: 20,
     paddingTop: 60,
+    paddingBottom: 120,
   },
   backButton: {
     marginBottom: 20,
@@ -136,15 +146,37 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   qrContainer: {
+    padding: 24,
+    borderRadius: 20,
     alignItems: 'center',
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 30,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  workerInfo: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 15,
+  qrWrapper: {
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+  },
+  qrDownloadContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  qrInfo: {
+    alignItems: 'center',
+  },
+  workerIdLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  workerId: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   addButton: {
     flexDirection: 'row',

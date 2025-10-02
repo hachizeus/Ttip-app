@@ -17,10 +17,10 @@ export const getBiometricCapability = async (): Promise<BiometricCapability> => 
     const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
     
     let biometricType = 'Biometric';
-    if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-      biometricType = 'Fingerprint';
-    } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+    if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
       biometricType = 'Face ID';
+    } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+      biometricType = 'Fingerprint';
     }
     
     return {
@@ -41,10 +41,12 @@ export const getBiometricCapability = async (): Promise<BiometricCapability> => 
 
 export const authenticateWithBiometric = async (): Promise<{ success: boolean; error?: string }> => {
   try {
+    const capability = await getBiometricCapability();
     const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Sign in with biometric',
+      promptMessage: `Sign in with ${capability.biometricType}`,
       cancelLabel: 'Cancel',
-      fallbackLabel: 'Use passcode'
+      disableDeviceFallback: false,
+      fallbackLabel: 'Use Passcode'
     });
     
     if (result.success) {

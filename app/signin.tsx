@@ -1,25 +1,27 @@
 import { MaterialIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   Alert,
-  KeyboardAvoidingView,
-  Platform,
+  Animated,
+  Image,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  ScrollView,
+  Vibration,
+  View
 } from 'react-native'
 import FingerprintModal from '../components/FingerprintModal'
 import { getBiometricInfo, loginWithBiometric, sendOTP, verifyOTP } from '../lib/auth'
+import { fonts } from '../lib/fonts'
 import { formatPhoneForAPI, validateKenyanPhone } from '../lib/phone-utils'
 import { supabase } from '../lib/supabase'
-import { ThemeProvider } from '../lib/theme-context'
-import { fonts, fontWeights } from '../lib/fonts'
+import { useTheme } from '../lib/theme-context'
 
-function SignInContent() {
+function SignInScreen() {
+  const { colors } = useTheme();
   const [step, setStep] = useState<'phone' | 'otp'>('phone')
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
@@ -30,6 +32,9 @@ function SignInContent() {
   const [biometricLoading, setBiometricLoading] = useState(false)
   const [biometricAvailable, setBiometricAvailable] = useState(false)
   const scrollViewRef = useRef<ScrollView>(null)
+  const shakeAnimation = useRef(new Animated.Value(0)).current
+  const pulseAnimation = useRef(new Animated.Value(1)).current
+  const scaleAnimation = useRef(new Animated.Value(1)).current
 
   useEffect(() => {
     checkBiometricAvailability()
@@ -48,7 +53,44 @@ function SignInContent() {
     }
   }, [otp])
 
+  useEffect(() => {
+    if (phone.length === 10) {
+      handleSendOTP()
+    }
+  }, [phone])
 
+  useEffect(() => {
+    // Scale animation when typing
+    Animated.spring(scaleAnimation, {
+      toValue: phone.length > 0 ? 1.05 : 1,
+      useNativeDriver: true,
+    }).start()
+  }, [phone])
+
+
+
+  const shakeInput = () => {
+    Animated.sequence([
+      Animated.timing(shakeAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: -10, duration: 100, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 0, duration: 100, useNativeDriver: true })
+    ]).start()
+  }
+
+  const startPulseAnimation = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnimation, { toValue: 1.1, duration: 500, useNativeDriver: true }),
+        Animated.timing(pulseAnimation, { toValue: 1, duration: 500, useNativeDriver: true })
+      ])
+    ).start()
+  }
+
+  const stopPulseAnimation = () => {
+    pulseAnimation.stopAnimation()
+    pulseAnimation.setValue(1)
+  }
 
   const checkBiometricAvailability = async () => {
     try {
@@ -69,9 +111,13 @@ function SignInContent() {
       if (result.success) {
         router.dismissAll()
         router.replace('/(tabs)')
+      } else {
+        console.log('Biometric login failed:', result.error)
+        // Silently handle biometric failures without showing alerts
       }
     } catch (error) {
-      console.log('Biometric login failed:', error)
+      console.log('Biometric login error:', error)
+      Alert.alert('Error', 'Biometric authentication failed')
     } finally {
       setBiometricLoading(false)
     }
@@ -79,11 +125,14 @@ function SignInContent() {
 
   const handleSendOTP = async () => {
     if (!validateKenyanPhone(phone)) {
-      Alert.alert('Invalid Phone', 'Enter a valid Kenyan phone number (0712345678)')
+      shakeInput()
+      Vibration.vibrate(500)
+      setTimeout(() => setPhone(''), 400)
       return
     }
 
     setLoading(true)
+    startPulseAnimation()
     try {
       const apiPhone = formatPhoneForAPI(phone)
       
@@ -94,7 +143,9 @@ function SignInContent() {
         .single()
       
       if (error || !data) {
-        Alert.alert('Account Not Found', 'No account found with this number. Please sign up first.')
+        shakeInput()
+        Vibration.vibrate(500)
+        setTimeout(() => setPhone(''), 400)
         setLoading(false)
         return
       }
@@ -106,9 +157,12 @@ function SignInContent() {
       setStep('otp')
     } catch (error) {
       console.error('Send OTP error:', error)
-      Alert.alert('Error', 'Failed to send OTP. Please try again.')
+      shakeInput()
+      Vibration.vibrate(500)
+      setTimeout(() => setPhone(''), 400)
     } finally {
       setLoading(false)
+      stopPulseAnimation()
     }
   }
 
@@ -137,28 +191,43 @@ function SignInContent() {
   }
 
   const renderKeypadButton = (value: string | number, onPress: () => void, icon?: string) => (
-    <TouchableOpacity style={[styles.keypadButton, phone.length === 10 && styles.keypadButtonSmall]} onPress={onPress}>
+  <TouchableOpacity style={styles.keypadButton} onPress={onPress}>
       {icon ? (
-        <MaterialIcons name={icon as any} size={phone.length === 10 ? 20 : 28} color="#fff" />
+        icon === 'biometric' ? (
+          biometricType === 'Face ID' ? (
+            <MaterialIcons name="face" size={28} color={colors.text} />
+          ) : (
+            <MaterialIcons name="fingerprint" size={28} color={colors.text} />
+          )
+        ) : (
+          <MaterialIcons name={icon as any} size={28} color={colors.text} />
+        )
       ) : (
-        <Text style={[styles.keypadText, phone.length === 10 && styles.keypadTextSmall]}>{value}</Text>
+        <Text style={[styles.keypadText, { color: colors.text }]}>{value}</Text>
       )}
     </TouchableOpacity>
   )
 
   const renderPhoneStep = () => (
     <View style={styles.container}>
+      {/* Back Arrow */}
+      <TouchableOpacity style={{ position: 'absolute', left: 0, top: 40, zIndex: 10, padding: 8 }} onPress={() => router.back()}>
+        <MaterialIcons name="arrow-back" size={28} color={colors.text} />
+      </TouchableOpacity>
+      <View style={styles.logoContainer}>
+        <Image source={require('../assets/images/mylogo.png')} style={styles.logo} />
+      </View>
       <View style={styles.fixedTopSection}>
         <Text style={styles.label}>ENTER PHONE NUMBER:</Text>
-        <View style={styles.phoneBoxes}>
+        <Animated.View style={[styles.phoneBoxes, { transform: [{ translateX: shakeAnimation }, { scale: loading ? pulseAnimation : scaleAnimation }] }] }>
           {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((index) => (
-            <View key={index} style={[styles.phoneBox, { width: '8%' }]}>
-              <Text style={styles.phoneDigit}>
+            <View key={index} style={[styles.phoneBox, { width: '8%' }] }>
+              <Text style={[styles.phoneDigit, { color: colors.text }]}>
                 {phone.length > index ? phone[index] : ''}
               </Text>
             </View>
           ))}
-        </View>
+        </Animated.View>
 
         <TextInput
           style={styles.hiddenInput}
@@ -173,23 +242,23 @@ function SignInContent() {
 
       <View style={styles.keypadContainer}>
         <View style={styles.keypad}>
-          <View style={[styles.keypadRow, phone.length === 10 && styles.keypadRowSmall]}>
+          <View style={styles.keypadRow}>
             {renderKeypadButton(1, () => phone.length < 10 && setPhone(phone + '1'))}
             {renderKeypadButton(2, () => phone.length < 10 && setPhone(phone + '2'))}
             {renderKeypadButton(3, () => phone.length < 10 && setPhone(phone + '3'))}
           </View>
-          <View style={[styles.keypadRow, phone.length === 10 && styles.keypadRowSmall]}>
+          <View style={styles.keypadRow}>
             {renderKeypadButton(4, () => phone.length < 10 && setPhone(phone + '4'))}
             {renderKeypadButton(5, () => phone.length < 10 && setPhone(phone + '5'))}
             {renderKeypadButton(6, () => phone.length < 10 && setPhone(phone + '6'))}
           </View>
-          <View style={[styles.keypadRow, phone.length === 10 && styles.keypadRowSmall]}>
+          <View style={styles.keypadRow}>
             {renderKeypadButton(7, () => phone.length < 10 && setPhone(phone + '7'))}
             {renderKeypadButton(8, () => phone.length < 10 && setPhone(phone + '8'))}
             {renderKeypadButton(9, () => phone.length < 10 && setPhone(phone + '9'))}
           </View>
-          <View style={[styles.keypadRow, phone.length === 10 && styles.keypadRowSmall]}>
-            {biometricAvailable ? renderKeypadButton('', () => handleBiometricLogin(), 'fingerprint') : <View style={styles.keypadButton} />}
+          <View style={styles.keypadRow}>
+            {biometricAvailable ? renderKeypadButton('', () => handleBiometricLogin(), 'biometric') : <View style={styles.keypadButton} />}
             {renderKeypadButton(0, () => phone.length < 10 && setPhone(phone + '0'))}
             {renderKeypadButton('', () => setPhone(phone.slice(0, -1)), 'backspace')}
           </View>
@@ -199,18 +268,15 @@ function SignInContent() {
   )
 
   const renderOTPStep = () => (
-    <View style={styles.container}>
-      <View style={styles.fixedTopSection}>
+  <View style={styles.container}>
+  <View style={styles.fixedTopSection}>
         <Text style={styles.label}>ENTER OTP:</Text>
         
-        <View style={styles.otpDots}>
+  <View style={styles.otpDots}>
           {[0, 1, 2, 3].map((index) => (
-            <View 
-              key={index} 
-              style={[
-                styles.otpDot, 
-                otp.length > index && styles.otpDotFilled
-              ]} 
+            <View
+              key={index}
+              style={[styles.otpDot, otp.length > index ? styles.otpDotFilled : null]}
             />
           ))}
         </View>
@@ -244,9 +310,9 @@ function SignInContent() {
             {renderKeypadButton(9, () => otp.length < 4 && setOtp(otp + '9'))}
           </View>
           <View style={styles.keypadRow}>
-            <View style={styles.keypadButton} />
+            {biometricAvailable ? renderKeypadButton('', () => handleBiometricLogin(), 'biometric') : <View style={styles.keypadButton} />}
             {renderKeypadButton(0, () => otp.length < 4 && setOtp(otp + '0'))}
-            {biometricAvailable ? renderKeypadButton('', () => handleBiometricLogin(), 'fingerprint') : renderKeypadButton('', () => setOtp(otp.slice(0, -1)), 'backspace')}
+            {renderKeypadButton('', () => setOtp(otp.slice(0, -1)), 'backspace')}
           </View>
         </View>
       </View>
@@ -254,30 +320,18 @@ function SignInContent() {
   )
 
   return (
-    <ScrollView 
+    <ScrollView
       ref={scrollViewRef}
-      style={styles.wrapper}
+      style={[styles.wrapper, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
     >
-      {step === 'phone' ? (
-        <>
-          {renderPhoneStep()}
-          <View style={styles.bottomActions}>
-            {phone.length === 10 && (
-              <TouchableOpacity
-                style={styles.continueButton}
-                onPress={handleSendOTP}
-                disabled={loading}
-              >
-                <Text style={styles.continueButtonText}>
-                  {loading ? 'Sending...' : 'Continue'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </>
-      ) : renderOTPStep()}
+      {step === 'phone' ? renderPhoneStep() : renderOTPStep()}
+      
+      <View style={styles.developerCredit}>
+        <Image source={require('../assets/images/mylogo.png')} style={styles.creditLogo} />
+        <Text style={styles.creditText}>Developed by ElitJohns Digital Services</Text>
+      </View>
 
       <FingerprintModal
         visible={showBiometricModal}
@@ -290,10 +344,11 @@ function SignInContent() {
   )
 }
 
+export default SignInScreen
+
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
   },
   container: {
     flex: 1,
@@ -305,43 +360,42 @@ const styles = StyleSheet.create({
   },
   keypadContainer: {
     flex: 1,
-    justifyContent: 'flex-end',
-    paddingBottom: 60,
+    justifyContent: 'center',
+    paddingBottom: 5,
   },
 
   label: {
     fontSize: 16,
     fontFamily: fonts.medium,
-    fontWeight: fontWeights.medium,
-    color: '#999',
+    fontWeight: '500',
+    color: '#666666',
     textAlign: 'center',
     marginBottom: 40,
   },
   phoneBoxes: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 60,
+    marginBottom: 5,
     paddingHorizontal: 20,
   },
   phoneBox: {
     height: 40,
     borderWidth: 2,
-    borderColor: '#007AFF',
+    borderColor: '#e0e0e0',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    backgroundColor: '#007AFF20',
   },
   phoneDigit: {
     fontSize: 18,
     fontFamily: fonts.medium,
-    fontWeight: fontWeights.semibold,
-    color: '#fff',
+    fontWeight: '600',
   },
   otpDots: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 60,
+    marginBottom: 10,
     gap: 20,
   },
   otpDot: {
@@ -349,16 +403,17 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     borderWidth: 2,
-    borderColor: '#666',
+    borderColor: '#e0e0e0',
     backgroundColor: 'transparent',
   },
   otpDotFilled: {
-    backgroundColor: '#fff',
-    borderColor: '#fff',
+    backgroundColor: '#000000',
+    borderColor: '#000000',
   },
   keypad: {
     alignItems: 'center',
     marginBottom: 20,
+    marginTop: 80,
     height: '50%',
   },
   keypadRow: {
@@ -377,8 +432,7 @@ const styles = StyleSheet.create({
   keypadText: {
     fontSize: 24,
     fontFamily: fonts.light,
-    fontWeight: fontWeights.light,
-    color: '#fff',
+    fontWeight: '300',
   },
   keypadRowSmall: {
     marginBottom: 10,
@@ -411,7 +465,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontFamily: fonts.medium,
-    fontWeight: fontWeights.semibold,
+    fontWeight: '600',
   },
   hiddenInput: {
     position: 'absolute',
@@ -419,12 +473,31 @@ const styles = StyleSheet.create({
     width: 1,
     height: 1,
   },
+  logoContainer: {
+    alignItems: 'center',
+    paddingBottom: 20,
+  },
+  logo: {
+    width: 120,
+    height: 40,
+    resizeMode: 'contain',
+  },
+  developerCredit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    marginBottom: 20,
+    gap: 8,
+  },
+  creditLogo: {
+    width: 30,
+    height: 10,
+    resizeMode: 'contain',
+  },
+  creditText: {
+    fontSize: 11,
+    color: '#666666',
+  },
 })
 
-export default function SignInScreen() {
-  return (
-    <ThemeProvider>
-      <SignInContent />
-    </ThemeProvider>
-  )
-}

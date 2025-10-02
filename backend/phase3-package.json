@@ -1,0 +1,47 @@
+{
+  "name": "ttip-phase3-backend",
+  "version": "3.0.0",
+  "description": "TTip Phase 3 - Multi-Gateway, Security Hardening, Fraud Detection",
+  "main": "phase3-server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node phase3-server.js",
+    "dev": "node --watch phase3-server.js",
+    "test": "node test-phase3.js",
+    "setup-db": "node setup-phase3-db.js",
+    "generate-admin": "node generate-admin.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.56.1",
+    "axios": "^1.11.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.20.0",
+    "express-rate-limit": "^7.1.5",
+    "qrcode": "^1.5.3",
+    "stripe": "^14.15.0",
+    "jsonwebtoken": "^9.0.2",
+    "speakeasy": "^2.0.0",
+    "crypto": "^1.0.1",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4",
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "keywords": [
+    "payments",
+    "mpesa",
+    "stripe",
+    "paypal",
+    "fraud-detection",
+    "security",
+    "analytics"
+  ]
+}

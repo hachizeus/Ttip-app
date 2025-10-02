@@ -1,0 +1,24 @@
+{
+  "name": "ttip-phase1-backend",
+  "version": "1.0.0",
+  "description": "TTip Phase 1 MVP Backend with Auto-Payout",
+  "main": "phase1-server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node phase1-server.js",
+    "dev": "node phase1-server.js",
+    "test": "node test-phase1.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.56.1",
+    "axios": "^1.11.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.20.0",
+    "express-rate-limit": "^7.1.5",
+    "qrcode": "^1.5.3"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}

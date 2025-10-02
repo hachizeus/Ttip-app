@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Switch, Modal, Image } from 'react-native'
+import { Ionicons, MaterialIcons } from '@expo/vector-icons'
 import { router, useFocusEffect } from 'expo-router'
+import React, { useCallback, useEffect, useState } from 'react'
+import { Image, RefreshControl, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native'
+import GlobalModal from '../../components/GlobalModal'
+import { FacebookIcon, InstagramIcon, TwitterIcon, WhatsAppIcon } from '../../components/SocialIcons'
 import { getCurrentUser, logout } from '../../lib/auth'
-import { formatPhoneForDisplay } from '../../lib/phone-utils'
-import { getSubscriptionStatus } from '../../lib/subscription-utils'
-import { MaterialIcons, Ionicons } from '@expo/vector-icons'
-import { useTheme } from '../../lib/theme-context'
-import ModalOverlay from '../../components/ModalOverlay'
-import { supabase } from '../../lib/supabase'
 import { fonts, fontWeights } from '../../lib/fonts'
+import { formatPhoneForDisplay } from '../../lib/phone-utils'
+import { supabase } from '../../lib/supabase'
+import { useTheme } from '../../lib/theme-context'
 
 export default function ProfileScreen() {
   const { isDark, toggleTheme, colors } = useTheme()
@@ -16,6 +16,8 @@ export default function ProfileScreen() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [userProfile, setUserProfile] = useState<any>(null)
+  const [subscriptionPlan, setSubscriptionPlan] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     loadUserData()
@@ -27,25 +29,57 @@ export default function ProfileScreen() {
     }, [])
   )
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await loadUserData()
+    setRefreshing(false)
+  }, [])
+
   const loadUserData = async () => {
     const phone = await getCurrentUser()
     if (phone) {
       setUserPhone(formatPhoneForDisplay(phone))
       
-      // Load subscription status
-      const status = await getSubscriptionStatus(phone)
-      setSubscriptionStatus(status)
-      
-      // Load user profile data
+      // Load user profile data directly from database
       try {
         const { data: worker, error } = await supabase
           .from('workers')
-          .select('name, occupation, bio, profile_image_url')
+          .select('name, occupation, bio, profile_image_url, subscription_plan, subscription_expiry, created_at')
           .eq('phone', phone)
           .single()
         
         if (!error && worker) {
           setUserProfile(worker)
+          setSubscriptionPlan(worker.subscription_plan || '')
+          
+          // Calculate subscription status like subscription page
+          const now = new Date()
+          const createdAt = new Date(worker.created_at)
+          const trialEndDate = new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000)
+          const subscriptionExpiry = worker.subscription_expiry ? new Date(worker.subscription_expiry) : null
+          
+          const isTrialActive = now <= trialEndDate
+          const hasActiveSubscription = subscriptionExpiry && now < subscriptionExpiry
+          
+          let plan = worker.subscription_plan || 'free'
+          let isLimitedMode = false
+          
+          if (hasActiveSubscription) {
+            // Use actual subscription plan if active
+            plan = worker.subscription_plan
+          } else if (isTrialActive) {
+            plan = 'trial'
+          } else {
+            plan = 'free'
+            isLimitedMode = true
+          }
+          
+          setSubscriptionStatus({
+            plan,
+            isActive: isTrialActive || hasActiveSubscription,
+            isLimitedMode,
+            expiryDate: subscriptionExpiry?.toISOString() || null
+          })
         }
       } catch (error) {
         console.error('Error loading profile:', error)
@@ -60,6 +94,7 @@ export default function ProfileScreen() {
   const confirmLogout = async () => {
     setShowLogoutModal(false)
     await logout()
+    // Go to welcome page
     router.replace('/welcome')
   }
 
@@ -68,13 +103,20 @@ export default function ProfileScreen() {
       {/* Fixed Profile Section */}
       <View style={[styles.fixedProfileSection, { backgroundColor: colors.background }]}>
         <View style={styles.profileHeader}>
-          {userProfile?.profile_image_url ? (
-            <Image source={{ uri: userProfile.profile_image_url }} style={styles.profileImage} />
-          ) : (
-            <View style={[styles.avatarContainer, { backgroundColor: colors.primary }]}>
-              <MaterialIcons name="person" size={30} color="#fff" />
-            </View>
-          )}
+          <View style={styles.profileImageContainer}>
+            {userProfile?.profile_image_url ? (
+              <Image source={{ uri: userProfile.profile_image_url }} style={styles.profileImage} />
+            ) : (
+              <View style={[styles.avatarContainer, { backgroundColor: colors.primary }]}>
+                <MaterialIcons name="person" size={30} color="#fff" />
+              </View>
+            )}
+            {(subscriptionPlan === 'pro_plan' || subscriptionPlan === 'pro') && (
+              <View style={styles.profileCrownContainer}>
+                <MaterialIcons name="workspace-premium" size={18} color="#FFD700" />
+              </View>
+            )}
+          </View>
           <View style={styles.profileInfo}>
             {userProfile?.name && (
               <Text style={[styles.name, { color: colors.text }]}>{userProfile.name}</Text>
@@ -85,26 +127,50 @@ export default function ProfileScreen() {
           </View>
         </View>
         
-        <Text style={[styles.bio, { color: colors.text }]}>
-          {userProfile?.bio || 'No bio available. Update your profile in settings.'}
-        </Text>
-        
-        {subscriptionStatus && (
-          <View style={[
-            styles.planBadge,
-            { backgroundColor: subscriptionStatus.isLimitedMode ? '#FF6B6B' : '#00C851' }
-          ]}>
-            <Text style={styles.planBadgeText}>
-              {subscriptionStatus.plan === 'trial' ? 'Free Trial' :
-               subscriptionStatus.plan === 'free' ? 'Limited Mode' :
-               subscriptionStatus.plan.charAt(0).toUpperCase() + subscriptionStatus.plan.slice(1)}
-            </Text>
-          </View>
+        {userProfile?.bio && (
+          <Text style={[styles.bio, { color: colors.text }]}>
+            {userProfile.bio}
+          </Text>
         )}
+        
+        <View style={styles.statsRow}>
+          {subscriptionStatus && (
+            <View style={[
+              styles.planBadge,
+              { backgroundColor: subscriptionStatus.isLimitedMode ? '#FF6B6B' : '#00C851' }
+            ]}>
+              <MaterialIcons 
+                name={subscriptionStatus.isLimitedMode ? 'block' : 'verified'} 
+                size={14} 
+                color="#fff" 
+                style={{ marginRight: 4 }}
+              />
+              <Text style={styles.planBadgeText}>
+                {subscriptionStatus.plan === 'trial' ? 'Free Trial' :
+                 subscriptionStatus.plan === 'free' ? 'Limited Mode' :
+                 subscriptionStatus.plan === 'lite' ? 'Lite Plan' :
+                 subscriptionStatus.plan === 'pro' ? 'Pro Plan' :
+                 subscriptionStatus.plan === 'pro_plan' ? 'Pro Plan' :
+                 subscriptionStatus.plan.charAt(0).toUpperCase() + subscriptionStatus.plan.slice(1)}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Scrollable Menu */}
-      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
         <View style={[styles.menu, { marginTop: 20 }]}>
         <TouchableOpacity 
           style={[styles.menuItem, { backgroundColor: colors.background }]}
@@ -155,28 +221,30 @@ export default function ProfileScreen() {
           onPress={() => router.push('/settings')}
         >
           <View style={[styles.menuIconContainer, { backgroundColor: colors.primary }]}>
-            <MaterialIcons name="settings" size={20} color="#fff" />
+            <MaterialIcons name="edit" size={20} color="#fff" />
           </View>
           <View style={styles.menuContent}>
-            <Text style={[styles.menuText, { color: colors.text }]}>Settings</Text>
-            <Text style={[styles.menuSubtext, { color: colors.textSecondary }]}>Edit profile & preferences</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Edit Profile</Text>
+            <Text style={[styles.menuSubtext, { color: colors.textSecondary }]}>Update your information</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
 
         <TouchableOpacity 
           style={[styles.menuItem, { backgroundColor: colors.background }]}
-          onPress={() => router.push('/leaderboard')}
+          onPress={() => router.push('/about')}
         >
-          <View style={[styles.menuIconContainer, { backgroundColor: colors.primary }]}>
-            <MaterialIcons name="leaderboard" size={20} color="#fff" />
+          <View style={[styles.menuIconContainer, { backgroundColor: '#666' }]}>
+            <MaterialIcons name="info" size={20} color="#fff" />
           </View>
           <View style={styles.menuContent}>
-            <Text style={[styles.menuText, { color: colors.text }]}>View Leaderboard</Text>
-            <Text style={[styles.menuSubtext, { color: colors.textSecondary }]}>See top earners</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>About TTip</Text>
+            <Text style={[styles.menuSubtext, { color: colors.textSecondary }]}>App info & version</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
+
+  {/* Removed View Leaderboard menu item */}
 
         <TouchableOpacity 
           style={[styles.menuItem, styles.logoutItem, { backgroundColor: colors.background }]}
@@ -186,51 +254,60 @@ export default function ProfileScreen() {
           <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
+
+        <View style={styles.socialLinks}>
+          <Text style={[styles.socialTitle, { color: colors.text }]}>Follow Us</Text>
+          <View style={styles.socialRow}>
+            <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#1877F2' }]}>
+              <FacebookIcon size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#1DA1F2' }]}>
+              <TwitterIcon size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#E4405F' }]}>
+              <InstagramIcon size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#25D366' }]}>
+              <WhatsAppIcon size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        <View style={styles.legalLinks}>
+          <TouchableOpacity onPress={() => router.push('/privacy-policy')}>
+            <Text style={[styles.legalText, { color: colors.textSecondary }]}>Privacy Policy</Text>
+          </TouchableOpacity>
+          <Text style={[styles.legalSeparator, { color: colors.textSecondary }]}>•</Text>
+          <TouchableOpacity onPress={() => router.push('/terms-of-service')}>
+            <Text style={[styles.legalText, { color: colors.textSecondary }]}>Terms of Service</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Custom Logout Modal */}
-      <Modal
-        visible={showLogoutModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowLogoutModal(false)}
-      >
-        <ModalOverlay visible={showLogoutModal}>
-          <View style={styles.logoutModalContainer}>
-            <View style={[styles.logoutModalContent, { backgroundColor: colors.background }]}>
-              <View style={[styles.logoutModalHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.logoutModalTitle, { color: colors.text }]}>Logout</Text>
-                <TouchableOpacity onPress={() => setShowLogoutModal(false)} style={styles.logoutCloseButton}>
-                  <MaterialIcons name="close" size={24} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.logoutModalBody}>
-                <MaterialIcons name="logout" size={48} color="#FF3B30" style={styles.logoutIcon} />
-                <Text style={[styles.logoutMessage, { color: colors.textSecondary }]}>
-                  Are you sure you want to logout?
-                </Text>
-                
-                <View style={styles.logoutButtons}>
-                  <TouchableOpacity
-                    style={[styles.logoutButton, styles.cancelLogoutButton, { borderColor: colors.border }]}
-                    onPress={() => setShowLogoutModal(false)}
-                  >
-                    <Text style={[styles.cancelLogoutText, { color: colors.text }]}>Cancel</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={[styles.logoutButton, styles.confirmLogoutButton]}
-                    onPress={confirmLogout}
-                  >
-                    <Text style={styles.confirmLogoutText}>Logout</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
+      <GlobalModal visible={showLogoutModal} onClose={() => setShowLogoutModal(false)} blurIntensity={100}>
+        <View style={[styles.logoutModalContent, { backgroundColor: colors.background }]}>
+          <MaterialIcons name="logout" size={48} color="#FF3B30" style={styles.logoutIcon} />
+          <Text style={[styles.logoutMessage, { color: colors.text }]}>
+            Are you sure you want to logout?
+          </Text>
+          
+          <View style={styles.logoutButtons}>
+            <TouchableOpacity
+              style={[styles.logoutButton, styles.cancelLogoutButton, { borderColor: colors.border }]}
+              onPress={() => setShowLogoutModal(false)}
+            >
+              <Text style={[styles.cancelLogoutText, { color: colors.text }]}>Cancel</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.logoutButton, styles.confirmLogoutButton]}
+              onPress={confirmLogout}
+            >
+              <Text style={styles.confirmLogoutText}>Logout</Text>
+            </TouchableOpacity>
           </View>
-        </ModalOverlay>
-      </Modal>
+        </View>
+      </GlobalModal>
       </ScrollView>
     </View>
   )
@@ -242,9 +319,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   fixedProfileSection: {
-    paddingTop: 60,
+    paddingTop: 40,
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 8,
     zIndex: 1000,
     elevation: 5,
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
@@ -260,18 +337,37 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
-  profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  profileImageContainer: {
+    position: 'relative',
     marginRight: 16,
+  },
+  profileImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  profileCrownContainer: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   profileInfo: {
     flex: 1,
@@ -298,17 +394,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   planBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
     alignSelf: 'flex-start',
   },
   planBadgeText: {
     color: '#fff',
-    fontSize: 14,
-    fontFamily: fonts.bold,
-    fontWeight: fontWeights.bold,
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    fontWeight: fontWeights.medium,
   },
   bio: {
     fontSize: 14,
@@ -370,32 +473,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+  },
+  blurBackground: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  logoutCenterContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   logoutModalContent: {
-    width: '100%',
-    maxWidth: 300,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  logoutModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    width: 300,
+    padding: 30,
+    borderRadius: 20,
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-  },
-  logoutModalTitle: {
-    fontSize: 20,
-    fontFamily: fonts.bold,
-    fontWeight: fontWeights.bold,
-  },
-  logoutCloseButton: {
-    padding: 4,
-  },
-  logoutModalBody: {
-    padding: 20,
-    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   logoutIcon: {
     marginBottom: 16,
@@ -405,6 +500,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontWeight: fontWeights.regular,
     textAlign: 'center',
+    marginTop: 16,
     marginBottom: 24,
   },
   logoutButtons: {
@@ -432,5 +528,46 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  legalLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 30,
+    marginBottom: 20,
+  },
+  legalText: {
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  legalSeparator: {
+    fontSize: 14,
+    marginHorizontal: 10,
+  },
+  socialLinks: {
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 15,
+  },
+  socialTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  socialButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
 })

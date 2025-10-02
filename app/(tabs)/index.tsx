@@ -1,10 +1,11 @@
 import { MaterialIcons } from '@expo/vector-icons'
 import { router, useFocusEffect } from 'expo-router'
 import React, { useEffect, useState, useCallback } from 'react'
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native'
-import { BlurView } from 'expo-blur'
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image, RefreshControl } from 'react-native'
+
 import QRCode from 'react-native-qrcode-svg'
 import ModalOverlay from '../../components/ModalOverlay'
+import GlobalModal from '../../components/GlobalModal'
 import NotificationsModal from '../../components/NotificationsModal'
 import { useNotifications } from '../../hooks/useNotifications'
 import { getCurrentUser, getCurrentUserName, isLoggedIn } from '../../lib/auth'
@@ -12,7 +13,13 @@ import { checkMilestones } from '../../lib/notifications'
 import { formatPhoneForDisplay } from '../../lib/phone-utils'
 import { supabase } from '../../lib/supabase'
 import { useTheme } from '../../lib/theme-context'
+import { getSubscriptionStatus } from '../../lib/subscription-utils'
 import { fonts, fontWeights } from '../../lib/fonts'
+import { NetworkManager } from '../../lib/network-manager'
+import { OfflineStorage } from '../../lib/offline-storage'
+import { OfflinePayment } from '../../lib/offline-payment'
+import { validateUserOnline } from '../../lib/offline-auth'
+import OptimizedImage from '../../components/OptimizedImage'
 
 export default function HomeScreen() {
   const { colors } = useTheme()
@@ -26,12 +33,37 @@ export default function HomeScreen() {
   const [totalTips, setTotalTips] = useState(0)
   const [tipCount, setTipCount] = useState(0)
   const [profileImage, setProfileImage] = useState('')
+  const [isOnline, setIsOnline] = useState(true)
+  const [subscriptionPlan, setSubscriptionPlan] = useState('')
+  const [showAmount, setShowAmount] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [offlinePayments, setOfflinePayments] = useState({ pending: 0, total: 0 })
+  const [isLimitedMode, setIsLimitedMode] = useState(false)
+
+  // Network status monitoring
+  useEffect(() => {
+    const unsubscribe = NetworkManager.addListener(setIsOnline);
+    return unsubscribe;
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       checkAuth()
+      loadOfflinePayments()
     }, [])
   )
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await checkAuth()
+    await loadOfflinePayments()
+    setRefreshing(false)
+  }, [])
+
+  const loadOfflinePayments = async () => {
+    const status = await OfflinePayment.getOfflinePaymentStatus()
+    setOfflinePayments(status)
+  }
 
   const checkAuth = async () => {
     const loggedIn = await isLoggedIn()
@@ -41,6 +73,14 @@ export default function HomeScreen() {
     }
     const phone = await getCurrentUser()
     const name = await getCurrentUserName()
+    
+    // Optional: validate user online (doesn't affect login state)
+    if (isOnline) {
+      const isValidOnline = await validateUserOnline()
+      if (!isValidOnline) {
+        console.log('User not found online, but staying logged in for offline use')
+      }
+    }
     
     if (phone) {
       setUserPhone(formatPhoneForDisplay(phone))
@@ -53,12 +93,13 @@ export default function HomeScreen() {
     if (phone) {
       console.log('Fetching worker data for phone:', phone)
       
-      // Try to find worker data with proper error handling and force refresh
-      const { data: workerData, error } = await supabase
-        .from('workers')
-        .select('name, worker_id, total_tips, tip_count, occupation, profile_image_url')
-        .eq('phone', phone)
-        .maybeSingle()
+      try {
+        // Try to find worker data with proper error handling and force refresh
+        const { data: workerData, error } = await supabase
+          .from('workers')
+          .select('name, worker_id, total_tips, tip_count, occupation, profile_image_url')
+          .eq('phone', phone)
+          .maybeSingle()
         
       // Force refresh profile image if it exists
       if (workerData?.profile_image_url) {
@@ -80,6 +121,21 @@ export default function HomeScreen() {
         if (workerData.profile_image_url) {
           setProfileImage(workerData.profile_image_url)
         }
+        
+        // Get subscription plan for crown display
+        const { data: subscription } = await supabase
+          .from('workers')
+          .select('subscription_plan')
+          .eq('phone', phone)
+          .single()
+        
+        if (subscription) {
+          setSubscriptionPlan(subscription.subscription_plan)
+        }
+        
+        // Check if user is in limited mode
+        const subscriptionStatus = await getSubscriptionStatus(phone)
+        setIsLimitedMode(subscriptionStatus.isLimitedMode)
         const newTotal = workerData.total_tips || 0
         const previousTotal = totalTips
         setTotalTips(newTotal)
@@ -90,10 +146,35 @@ export default function HomeScreen() {
           await checkMilestones(newTotal, previousTotal)
           refreshUnreadCount()
         }
-      } else {
-        console.log('No worker found for phone:', phone)
-        // User might not be registered as worker yet
-        setUserName('User')
+        
+        // Store data for offline use
+        await OfflineStorage.storeUserData({
+          name: workerData.name,
+          occupation: workerData.occupation,
+          worker_id: workerData.worker_id,
+          total_tips: workerData.total_tips,
+          tip_count: workerData.tip_count,
+          phone: phone
+        })
+        } else {
+          console.log('No worker found for phone:', phone)
+          // User might not be registered as worker yet
+          setUserName('User')
+        }
+      } catch (error) {
+        console.log('Failed to fetch worker data, using cached data')
+        // Use cached/offline data when network fails
+        setUserName(name || 'User')
+        
+        // Load offline data
+        const offlineData = await OfflineStorage.getUserData()
+        if (offlineData) {
+          setUserName(offlineData.name || name || 'User')
+          setUserOccupation(offlineData.occupation || 'Service Worker')
+          setWorkerID(offlineData.worker_id || '')
+          setTotalTips(offlineData.total_tips || 0)
+          setTipCount(offlineData.tip_count || 0)
+        }
       }
     }
   }
@@ -103,12 +184,22 @@ export default function HomeScreen() {
       {/* Fixed Header Only */}
       <View style={[styles.fixedHeader, { backgroundColor: colors.background }]}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={() => router.push('/profile')}>
+          <TouchableOpacity onPress={() => router.push('/profile')} style={styles.profileContainer}>
             {profileImage ? (
-              <Image source={{ uri: profileImage }} style={styles.profilePic} />
+              <OptimizedImage 
+                source={{ uri: profileImage }} 
+                style={styles.profilePic}
+                lazy={true}
+                errorComponent={
+                  <MaterialIcons name="person" size={24} color={colors.text} />
+                }
+              />
             ) : (
-              <View style={[styles.profilePic, { backgroundColor: colors.border }]}>
-                <MaterialIcons name="person" size={24} color={colors.text} />
+              <MaterialIcons name="person" size={24} color={colors.text} />
+            )}
+            {(subscriptionPlan === 'pro_plan' || subscriptionPlan === 'pro') && (
+              <View style={styles.crownContainer}>
+                <MaterialIcons name="workspace-premium" size={16} color="#FFD700" />
               </View>
             )}
           </TouchableOpacity>
@@ -123,7 +214,7 @@ export default function HomeScreen() {
             onPress={() => setShowNotifications(true)}
             style={styles.notificationButton}
           >
-            <MaterialIcons name="notifications" size={24} color={colors.text} />
+            <MaterialIcons name="notifications-none" size={24} color="#999ca0" />
             {unreadCount > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
@@ -139,6 +230,14 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContainer} 
         showsVerticalScrollIndicator={false}
         bounces={true}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         {/* Earnings Card */}
         <View style={[styles.balanceCard, { backgroundColor: colors.card }]}>
@@ -148,7 +247,21 @@ export default function HomeScreen() {
               <Text style={[styles.brandText, { color: colors.text }]}>TTip Earnings</Text>
             </View>
           </View>
-          <Text style={[styles.balanceAmount, { color: colors.text }]}>KSh {totalTips.toLocaleString()}</Text>
+          <View style={styles.balanceRow}>
+            <Text style={[styles.balanceAmount, { color: colors.text }]}>
+              KSh {showAmount ? totalTips.toLocaleString() : '••••••'}
+            </Text>
+            <TouchableOpacity 
+              onPress={() => setShowAmount(!showAmount)}
+              style={styles.eyeToggle}
+            >
+              <MaterialIcons 
+                name={showAmount ? 'visibility' : 'visibility-off'} 
+                size={20} 
+                color={colors.textSecondary} 
+              />
+            </TouchableOpacity>
+          </View>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={[styles.statValue, { color: colors.primary }]}>{tipCount}</Text>
@@ -162,17 +275,29 @@ export default function HomeScreen() {
           </View>
         </View>
 
-
+        {/* Offline Status */}
+        {!isOnline && (
+          <View style={styles.offlineIndicator}>
+            <MaterialIcons name="wifi-off" size={16} color="#FF6B00" />
+            <Text style={styles.offlineText}>Offline Mode</Text>
+            {offlinePayments.pending > 0 && (
+              <Text style={styles.pendingText}>{offlinePayments.pending} pending</Text>
+            )}
+          </View>
+        )}
+        
+        {/* Limited Mode Status */}
+        {isLimitedMode && (
+          <View style={styles.limitedModeIndicator}>
+            <MaterialIcons name="lock" size={16} color="#9C27B0" />
+            <Text style={styles.limitedModeText}>Limited Mode</Text>
+            <TouchableOpacity onPress={() => router.push('/subscription')}>
+              <Text style={styles.upgradeText}>Upgrade</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
       <View style={styles.quickActions}>
-        <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => setShowQR(true)}>
-          <View style={[styles.actionIcon, { backgroundColor: colors.primary }]}>
-            <MaterialIcons name="qr-code" size={28} color="#fff" />
-          </View>
-          <Text style={[styles.actionTitle, { color: colors.text }]}>My QR Code</Text>
-          <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Show to customers</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => router.push('/widget-setup')}>
           <View style={[styles.actionIcon, { backgroundColor: colors.primary }]}>
             <MaterialIcons name="widgets" size={28} color="#fff" />
@@ -180,9 +305,7 @@ export default function HomeScreen() {
           <Text style={[styles.actionTitle, { color: colors.text }]}>QR Widget</Text>
           <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Add to home screen</Text>
         </TouchableOpacity>
-      </View>
 
-      <View style={styles.quickActions}>
         <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => router.push('/analytics')}>
           <View style={[styles.actionIcon, { backgroundColor: colors.accent }]}>
             <MaterialIcons name="analytics" size={28} color="#fff" />
@@ -190,7 +313,9 @@ export default function HomeScreen() {
           <Text style={[styles.actionTitle, { color: colors.text }]}>Analytics</Text>
           <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>View earnings</Text>
         </TouchableOpacity>
+      </View>
 
+      <View style={styles.quickActions}>
         <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => router.push('/scanner')}>
           <View style={[styles.actionIcon, { backgroundColor: colors.accent }]}>
             <MaterialIcons name="qr-code-scanner" size={28} color="#fff" />
@@ -198,9 +323,7 @@ export default function HomeScreen() {
           <Text style={[styles.actionTitle, { color: colors.text }]}>Scan QR</Text>
           <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Scan to tip</Text>
         </TouchableOpacity>
-      </View>
 
-      <View style={styles.quickActions}>
         <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]} onPress={() => router.push('/subscription')}>
           <View style={[styles.actionIcon, { backgroundColor: colors.accent }]}>
             <MaterialIcons name="diamond" size={28} color="#fff" />
@@ -208,7 +331,9 @@ export default function HomeScreen() {
           <Text style={[styles.actionTitle, { color: colors.text }]}>Subscription</Text>
           <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Upgrade plan</Text>
         </TouchableOpacity>
+      </View>
 
+      <View style={styles.quickActions}>
         <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.background }]}>
           <View style={[styles.actionIcon, { backgroundColor: '#666' }]}>
             <MaterialIcons name="more-horiz" size={28} color="#fff" />
@@ -238,42 +363,57 @@ export default function HomeScreen() {
         </View>
       </View>
       
-      <Modal visible={showQR} transparent animationType="fade">
-        <TouchableOpacity 
-          style={styles.qrModalContainer} 
-          activeOpacity={1} 
-          onPress={() => setShowQR(false)}
-        >
-          <BlurView intensity={60} tint="dark" style={styles.blurBackground} />
-          <View style={styles.qrCenterContainer}>
-            {workerID && (
-              <View style={[styles.qrCodeWrapper, { backgroundColor: '#ffffff' }]}>
-                <QRCode
-                  value={`${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-app.onrender.com'}/tip/${workerID}?ref=app&worker=${workerID}&timestamp=${Date.now()}`}
-                  size={200}
-                  backgroundColor="white"
-                  color="black"
-                  logo={require('../../assets/images/mylogo.png')}
-                  logoSize={50}
-                  logoBackgroundColor="white"
-                  logoMargin={4}
-                  logoBorderRadius={25}
-                  ecl="M"
-                />
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      <GlobalModal visible={showQR} onClose={() => setShowQR(false)}>
+        <View style={styles.qrCenterContainer}>
+          {workerID && (
+            <View style={[styles.qrCodeWrapper, { backgroundColor: '#ffffff' }]}>
+              <QRCode
+                value={isOnline 
+                  ? `${process.env.EXPO_PUBLIC_BACKEND_URL || 'https://ttip-app.onrender.com'}/tip/${workerID}?ref=app&worker=${workerID}&timestamp=${Date.now()}`
+                  : NetworkManager.handleOfflineQRScan(workerID)
+                }
+                size={200}
+                backgroundColor="white"
+                color="black"
+                logo={require('../../assets/images/mylogo.png')}
+                logoSize={40}
+                logoBackgroundColor="transparent"
+                logoMargin={2}
+                logoBorderRadius={20}
+                ecl="M"
+              />
+            </View>
+          )}
+        </View>
+      </GlobalModal>
 
-      <NotificationsModal
-        visible={showNotifications}
-        onClose={() => {
-          setShowNotifications(false)
-          refreshUnreadCount()
-        }}
-      />
       </ScrollView>
+      
+      {showNotifications && (
+        <TouchableOpacity 
+          style={styles.dropdownOverlay} 
+          activeOpacity={1} 
+          onPress={() => {
+            setShowNotifications(false)
+            refreshUnreadCount()
+          }}
+        >
+          <NotificationsModal
+            visible={showNotifications}
+            onClose={() => {
+              setShowNotifications(false)
+              refreshUnreadCount()
+            }}
+          />
+        </TouchableOpacity>
+      )}
+      
+      <TouchableOpacity 
+        style={[styles.floatingButton, { backgroundColor: colors.primary }]} 
+        onPress={() => setShowQR(true)}
+      >
+        <MaterialIcons name="qr-code" size={28} color="#fff" />
+      </TouchableOpacity>
     </View>
   )
 }
@@ -304,6 +444,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  profileContainer: {
+    position: 'relative',
+  },
+  crownContainer: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -311,7 +470,7 @@ const styles = StyleSheet.create({
 
   notificationButton: {
     position: 'relative',
-    marginRight: 0,
+    marginRight: -7,
     marginLeft: -50,
   },
   badge: {
@@ -335,9 +494,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#333',
-    justifyContent: 'center',
-    alignItems: 'center',
     marginRight: 12,
   },
   greetingContainer: {
@@ -383,13 +539,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+
   balanceAmount: {
     fontSize: 36,
-    fontFamily: fonts.light,
-    fontWeight: fontWeights.light,
+    fontWeight: '300',
     letterSpacing: 0.5,
-    marginBottom: 12,
-    textAlign: 'center',
+  },
+
+  eyeToggle: {
+    marginLeft: 12,
+    padding: 4,
   },
   statsRow: {
     flexDirection: 'row',
@@ -507,5 +672,77 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: -7,
+    bottom: 0,
+    zIndex: 1100,
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 120,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  offlineIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF3E0',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  offlineText: {
+    color: '#FF6B00',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pendingText: {
+    color: '#FF6B00',
+    fontSize: 12,
+    backgroundColor: '#FFE0B2',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  limitedModeIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3E5F5',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  limitedModeText: {
+    color: '#9C27B0',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  upgradeText: {
+    color: '#9C27B0',
+    fontSize: 12,
+    backgroundColor: '#E1BEE7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    fontWeight: '600',
   },
 })

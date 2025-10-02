@@ -3,19 +3,7 @@ import { View, StyleSheet, Text } from 'react-native'
 import { useTheme } from '../lib/theme-context'
 
 export default function LoadingScreen() {
-  const { colors } = useTheme()
-
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.logoContainer, { backgroundColor: colors.primary }]}>
-        <Text style={styles.logoText}>T</Text>
-      </View>
-      <Text style={[styles.appName, { color: colors.text }]}>TTip</Text>
-      <View style={[styles.loadingBar, { backgroundColor: colors.border }]}>
-        <View style={[styles.loadingProgress, { backgroundColor: colors.primary }]} />
-      </View>
-    </View>
-  )
+  return null
 }
 
 const styles = StyleSheet.create({

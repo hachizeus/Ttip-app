@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTip Admin Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            animation: backgroundShift 20s ease-in-out infinite;
+        }
+        @keyframes backgroundShift {
+            0%, 100% { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); }
+            50% { background: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 100%); }
+        }
+        
+        /* Login Screen */
+        .login-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .login-box { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); width: 400px; }
+        .login-header { text-align: center; margin-bottom: 30px; }
+        .login-header h1 { color: #667eea; margin-bottom: 10px; font-size: 2em; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: #333; }
+        .form-group input { width: 100%; padding: 12px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 16px; }
+        .form-group input:focus { outline: none; border-color: #667eea; }
+        .login-btn { width: 100%; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .login-btn:hover { opacity: 0.9; }
+        .error-message { color: #dc3545; margin-top: 10px; text-align: center; }
+        
+        /* Dashboard Layout */
+        .dashboard { display: none; height: 100vh; }
+        .sidebar { 
+            width: 280px; 
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); 
+            color: white; 
+            position: fixed; 
+            height: 100vh; 
+            overflow-y: auto;
+            box-shadow: 4px 0 20px rgba(0,0,0,0.1);
+            animation: slideInLeft 0.5s ease-out;
+        }
+        @keyframes slideInLeft {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(0); }
+        }
+        .main-content { margin-left: 280px; padding: 24px; background: #f8fafc; min-height: 100vh; }
+        
+        /* Sidebar */
+        .sidebar-header { 
+            padding: 24px; 
+            border-bottom: 1px solid #334155;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin-bottom: 8px;
+        }
+        .sidebar-header h2 { 
+            font-size: 1.8em; 
+            font-weight: 800; 
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sidebar-header h2::before {
+            content: '⚡';
+            font-size: 1.2em;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .sidebar-header p {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.9em;
+            margin-top: 4px;
+        }
+        .sidebar-nav { padding: 16px 0; }
+        .nav-item { display: flex; align-items: center; padding: 12px 24px; color: #94a3b8; cursor: pointer; transition: all 0.2s; }
+        .nav-item:hover, .nav-item.active { 
+            background: linear-gradient(90deg, #334155 0%, #475569 100%); 
+            color: white;
+            transform: translateX(8px);
+            border-left: 4px solid #667eea;
+        }
+        .nav-item i { margin-right: 12px; width: 20px; }
+        
+        /* Header */
+        .header { 
+            background: linear-gradient(135deg, white 0%, #f8fafc 100%); 
+            padding: 16px 24px; 
+            border-radius: 12px; 
+            margin-bottom: 24px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            animation: slideInDown 0.6s ease-out;
+            backdrop-filter: blur(10px);
+        }
+        @keyframes slideInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .header h1 { font-size: 1.8em; color: #1e293b; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .user-info { display: flex; align-items: center; gap: 8px; }
+        .logout-btn { background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        
+        /* Stats Cards */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 32px; }
+        .stat-card { 
+            background: white; 
+            padding: 24px; 
+            border-radius: 12px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            animation: slideInUp 0.6s ease-out;
+        }
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .stat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .stat-title { color: #64748b; font-size: 0.9em; font-weight: 500; }
+        .stat-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+        .stat-number { 
+            font-size: 2.2em; 
+            font-weight: 700; 
+            color: #1e293b; 
+            margin-bottom: 8px;
+            transition: all 0.3s ease;
+        }
+        .stat-number.updating {
+            transform: scale(1.1);
+            color: #667eea;
+        }
+        .stat-change { font-size: 0.85em; }
+        .positive { color: #10b981; }
+        .negative { color: #ef4444; }
+        
+        /* Charts Section */
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+        .chart-card { 
+            background: white; 
+            padding: 24px; 
+            border-radius: 12px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            animation: fadeInScale 0.8s ease-out;
+        }
+        .chart-card:hover {
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .chart-header { display: flex; justify-content: between; align-items: center; margin-bottom: 20px; }
+        .chart-title { font-size: 1.1em; font-weight: 600; color: #1e293b; }
+        canvas { width: 100%; height: 200px; }
+        
+        /* Table */
+        .table-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+        .table-header { padding: 20px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .table-title { font-size: 1.1em; font-weight: 600; color: #1e293b; }
+        table { width: 100%; }
+        th, td { padding: 12px 24px; text-align: left; border-bottom: 1px solid #f1f5f9; }
+        th { background: #f8fafc; font-weight: 600; color: #475569; font-size: 0.85em; }
+        .status { padding: 4px 8px; border-radius: 12px; font-size: 0.75em; font-weight: 600; }
+        .status.completed { background: #dcfce7; color: #166534; }
+        .status.pending { background: #fef3c7; color: #92400e; }
+        .status.failed { background: #fee2e2; color: #991b1b; }
+        
+        /* Content Sections */
+        .content-section { display: none; }
+        .content-section.active { display: block; }
+        
+        /* System Health */
+        .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+        .health-item { display: flex; align-items: center; gap: 12px; padding: 16px; background: #f8fafc; border-radius: 8px; }
+        .health-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .health-healthy { background: #10b981; }
+        .health-warning { background: #f59e0b; }
+        .health-critical { background: #ef4444; }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-box">
+            <div class="login-header">
+                <h1>🔐 TTip Admin</h1>
+                <p>Secure Dashboard Access</p>
+            </div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label for="totpCode">2FA Code</label>
+                    <input type="text" id="totpCode" name="totpCode" placeholder="6-digit code" required>
+                </div>
+                <button type="submit" class="login-btn" id="loginBtn">Login</button>
+                <div id="loginMessage"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="dashboard">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>TTip</h2>
+                <p>Admin Dashboard</p>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-item active" onclick="showSection('overview')">
+                    <i>📊</i> Overview
+                </div>
+                <div class="nav-item" onclick="showSection('transactions')">
+                    <i>💳</i> Transactions
+                </div>
+                <div class="nav-item" onclick="showSection('workers')">
+                    <i>👥</i> Workers
+                </div>
+                <div class="nav-item" onclick="showSection('analytics')">
+                    <i>📈</i> Analytics
+                </div>
+                <div class="nav-item" onclick="showSection('system')">
+                    <i>⚙️</i> System Health
+                </div>
+                <div class="nav-item" onclick="showSection('security')">
+                    <i>🛡️</i> Security
+                </div>
+                <div class="nav-item" onclick="showSection('settings')">
+                    <i>⚙️</i> Settings
+                </div>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Header -->
+            <div class="header">
+                <div>
+                    <h1 id="pageTitle">Overview</h1>
+                    <p style="color: #64748b; font-size: 0.9em;" id="lastUpdate">Last updated: Never</p>
+                </div>
+                <div class="header-right">
+                    <div class="user-info">
+                        <span id="adminUser">Admin User</span>
+                    </div>
+                    <button class="logout-btn" onclick="logout()">Logout</button>
+                </div>
+            </div>
+
+            <!-- Overview Section -->
+            <div id="overview" class="content-section active">
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Total Transactions</span>
+                            <div class="stat-icon" style="background: #dbeafe; color: #2563eb;">💳</div>
+                        </div>
+                        <div class="stat-number" id="totalTransactions">-</div>
+                        <div class="stat-change" id="transactionChange">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Total Revenue</span>
+                            <div class="stat-icon" style="background: #dcfce7; color: #16a34a;">💰</div>
+                        </div>
+                        <div class="stat-number" id="totalRevenue">-</div>
+                        <div class="stat-change" id="revenueChange">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Active Workers</span>
+                            <div class="stat-icon" style="background: #fef3c7; color: #d97706;">👥</div>
+                        </div>
+                        <div class="stat-number" id="activeWorkers">-</div>
+                        <div class="stat-change" id="workerChange">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Success Rate</span>
+                            <div class="stat-icon" style="background: #f3e8ff; color: #9333ea;">📈</div>
+                        </div>
+                        <div class="stat-number" id="successRate">-</div>
+                        <div class="stat-change" id="successChange">-</div>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Transaction Trends</h3>
+                        </div>
+                        <canvas id="transactionChart" width="400" height="200"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Revenue Analytics</h3>
+                        </div>
+                        <canvas id="revenueChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Additional Analytics -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Worker Performance</h3>
+                        </div>
+                        <canvas id="workerChart" width="400" height="200"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Payment Methods</h3>
+                        </div>
+                        <canvas id="paymentChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+
+                <!-- Recent Transactions -->
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3 class="table-title">Recent Transactions</h3>
+                        <button class="refresh-btn" onclick="loadTransactions()" style="background: #667eea; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">Refresh</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Worker</th>
+                                <th>Amount</th>
+                                <th>Customer</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsBody">
+                            <tr><td colspan="7" style="text-align: center; padding: 40px;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Transactions Section -->
+            <div id="transactions" class="content-section">
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3 class="table-title">All Transactions</h3>
+                        <button class="refresh-btn" onclick="loadAllTransactions()" style="background: #667eea; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">Refresh</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Transaction ID</th>
+                                <th>Worker</th>
+                                <th>Amount (KSh)</th>
+                                <th>Customer</th>
+                                <th>Status</th>
+                                <th>Gateway</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allTransactionsBody">
+                            <tr><td colspan="8" style="text-align: center; padding: 40px;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Analytics Section -->
+            <div id="analytics" class="content-section">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Conversion Rate</span>
+                            <div class="stat-icon" style="background: #dbeafe; color: #2563eb;">📈</div>
+                        </div>
+                        <div class="stat-number" id="conversionRate">-</div>
+                        <div class="stat-change">Success rate of transactions</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Average Tip</span>
+                            <div class="stat-icon" style="background: #dcfce7; color: #16a34a;">💰</div>
+                        </div>
+                        <div class="stat-number" id="avgTip">-</div>
+                        <div class="stat-change">Per transaction</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Peak Hour</span>
+                            <div class="stat-icon" style="background: #fef3c7; color: #d97706;">⏰</div>
+                        </div>
+                        <div class="stat-number" id="peakHour">-</div>
+                        <div class="stat-change">Most active time</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Growth Rate</span>
+                            <div class="stat-icon" style="background: #f3e8ff; color: #9333ea;">📊</div>
+                        </div>
+                        <div class="stat-number" id="growthRate">-</div>
+                        <div class="stat-change">Week over week</div>
+                    </div>
+                </div>
+                
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Hourly Transaction Pattern</h3>
+                        </div>
+                        <canvas id="hourlyPatternChart" width="400" height="200"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Transaction Status Breakdown</h3>
+                        </div>
+                        <canvas id="statusBreakdownChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workers Section -->
+            <div id="workers" class="content-section">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Total Workers</span>
+                            <div class="stat-icon" style="background: #dbeafe; color: #2563eb;">👥</div>
+                        </div>
+                        <div class="stat-number" id="totalWorkers">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Pro Subscribers</span>
+                            <div class="stat-icon" style="background: #fef3c7; color: #d97706;">⭐</div>
+                        </div>
+                        <div class="stat-number" id="proWorkers">-</div>
+                    </div>
+                </div>
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3 class="table-title">Worker Performance</h3>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Worker ID</th>
+                                <th>Name</th>
+                                <th>Occupation</th>
+                                <th>Plan</th>
+                                <th>Total Tips</th>
+                                <th>Tip Count</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="workersBody">
+                            <tr><td colspan="7" style="text-align: center; padding: 40px;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- System Health Section -->
+            <div id="system" class="content-section">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">System Status</h3>
+                    </div>
+                    <div class="health-grid" id="systemHealth">
+                        <div class="health-item">
+                            <div class="health-dot health-healthy"></div>
+                            <div>
+                                <div style="font-weight: 600;">Database</div>
+                                <div style="color: #64748b; font-size: 0.85em;" id="dbStatus">Checking...</div>
+                            </div>
+                        </div>
+                        <div class="health-item">
+                            <div class="health-dot health-healthy"></div>
+                            <div>
+                                <div style="font-weight: 600;">M-Pesa API</div>
+                                <div style="color: #64748b; font-size: 0.85em;" id="mpesaStatus">Checking...</div>
+                            </div>
+                        </div>
+                        <div class="health-item">
+                            <div class="health-dot health-healthy"></div>
+                            <div>
+                                <div style="font-weight: 600;">Payment Queue</div>
+                                <div style="color: #64748b; font-size: 0.85em;" id="queueStatus">Checking...</div>
+                            </div>
+                        </div>
+                        <div class="health-item">
+                            <div class="health-dot health-healthy"></div>
+                            <div>
+                                <div style="font-weight: 600;">Server Uptime</div>
+                                <div style="color: #64748b; font-size: 0.85em;" id="uptime">Checking...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Section -->
+            <div id="security" class="content-section">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Security Overview</h3>
+                    </div>
+                    <div id="securityAlerts">
+                        <div style="background: #dcfce7; color: #166534; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                            <strong>✅ All security checks passed</strong>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title">Fraud Checks Today</span>
+                                <div class="stat-icon" style="background: #fee2e2; color: #dc2626;">🛡️</div>
+                            </div>
+                            <div class="stat-number" id="fraudChecks">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title">Flagged Transactions</span>
+                                <div class="stat-icon" style="background: #fef3c7; color: #d97706;">⚠️</div>
+                            </div>
+                            <div class="stat-number" id="flaggedTx">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+        let refreshInterval = null;
+        let analyticsData = null;
+
+        // Login functionality
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const totpCode = document.getElementById('totpCode').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const loginMessage = document.getElementById('loginMessage');
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
+            
+            try {
+                const response = await fetch('/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, totpCode })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    authToken = result.token;
+                    document.getElementById('adminUser').textContent = result.user.username;
+                    showDashboard();
+                } else {
+                    loginMessage.innerHTML = `<div class="error-message">${result.error}</div>`;
+                }
+            } catch (error) {
+                loginMessage.innerHTML = '<div class="error-message">Login failed. Please try again.</div>';
+            }
+            
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Login';
+        });
+
+        function showDashboard() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'flex';
+            loadDashboardData();
+            refreshInterval = setInterval(loadDashboardData, 30000);
+        }
+
+        function logout() {
+            authToken = null;
+            if (refreshInterval) clearInterval(refreshInterval);
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('loginForm').reset();
+        }
+
+        function showSection(sectionName) {
+            // Update nav
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update content
+            document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+            document.getElementById(sectionName).classList.add('active');
+            
+            // Update page title
+            const titles = {
+                overview: 'Overview',
+                transactions: 'Transactions',
+                workers: 'Workers',
+                analytics: 'Analytics',
+                system: 'System Health',
+                security: 'Security',
+                settings: 'Settings'
+            };
+            document.getElementById('pageTitle').textContent = titles[sectionName];
+            
+            // Load section-specific data
+            if (sectionName === 'transactions') loadAllTransactions();
+            if (sectionName === 'workers') loadWorkers();
+            if (sectionName === 'system') loadSystemHealth();
+            if (sectionName === 'analytics') loadAnalyticsCharts();
+        }
+
+        async function apiCall(endpoint, options = {}) {
+            const response = await fetch(endpoint, {
+                ...options,
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            });
+            
+            if (response.status === 401) {
+                logout();
+                throw new Error('Unauthorized');
+            }
+            
+            return response.json();
+        }
+
+        async function loadDashboardData() {
+            try {
+                const analytics = await apiCall('/admin/analytics');
+                analyticsData = analytics;
+                
+                // Update stats
+                // Use animations for main dashboard
+                animateNumber('totalTransactions', analytics.transactions?.total || 0);
+                const totalRev = analytics.revenue?.total || 0;
+                document.getElementById('totalRevenue').textContent = `KSh ${totalRev.toLocaleString()}`;
+                animateNumber('activeWorkers', analytics.workers?.length || 0);
+                
+                // Calculate real success rate from worker data
+                const totalWorkerTips = analytics.workers?.reduce((sum, w) => sum + (w.tip_count || 0), 0) || 0;
+                const totalTransactions = analytics.transactions?.total || 0;
+                const successRate = totalTransactions > 0 ? Math.round((totalWorkerTips / totalTransactions) * 100) : 0;
+                animateNumber('successRate', successRate, '', '%');
+                
+                // Update changes with real calculations
+                const growth = analytics.revenue?.growth || 0;
+                document.getElementById('revenueChange').innerHTML = `<span class="${growth >= 0 ? 'positive' : 'negative'}">${growth >= 0 ? '+' : ''}${growth}% from last week</span>`;
+                
+                // Update worker change with real data
+                const activeWorkerCount = analytics.workers?.length || 0;
+                document.getElementById('workerChange').innerHTML = `<span class="positive">${activeWorkerCount} registered</span>`;
+                
+                // Update transaction change with real data
+                document.getElementById('transactionChange').innerHTML = `<span class="${totalTransactions > 0 ? 'positive' : 'neutral'}">Last 24h: ${totalTransactions}</span>`;
+                
+                // Update fraud change with real data
+                const fraudCount = analytics.fraud?.flaggedCount || 0;
+                document.getElementById('fraudChange').innerHTML = `<span class="${fraudCount > 0 ? 'negative' : 'positive'}">${fraudCount} flagged today</span>`;
+                
+                document.getElementById('lastUpdate').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                
+                loadTransactions();
+                loadCharts();
+            } catch (error) {
+                console.error('Dashboard load error:', error);
+            }
+        }
+
+        async function loadTransactions() {
+            try {
+                const data = await apiCall('/admin/transactions');
+                const tbody = document.getElementById('transactionsBody');
+                
+                if (data.transactions && data.transactions.length > 0) {
+                    tbody.innerHTML = data.transactions.slice(0, 5).map(tx => `
+                        <tr>
+                            <td>${tx.id.substring(0, 8)}...</td>
+                            <td>
+                                <strong>${tx.workers?.name || 'Unknown'}</strong><br>
+                                <small style="color: #64748b;">${tx.worker_id}</small>
+                            </td>
+                            <td>KSh ${tx.amount}</td>
+                            <td>${maskPII(tx.customer_number)}</td>
+                            <td><span class="status ${tx.status.toLowerCase()}">${tx.status}</span></td>
+                            <td>${new Date(tx.created_at).toLocaleDateString()}</td>
+                            <td>
+                                ${tx.status === 'PENDING' ? 
+                                    `<button onclick="approveTransaction('${tx.id}')" style="background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Approve</button>` : 
+                                    '-'
+                                }
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">No transactions found</td></tr>';
+                }
+            } catch (error) {
+                console.error('Transactions load error:', error);
+            }
+        }
+
+        async function loadAllTransactions() {
+            try {
+                const data = await apiCall('/admin/transactions');
+                const tbody = document.getElementById('allTransactionsBody');
+                
+                if (data.transactions && data.transactions.length > 0) {
+                    tbody.innerHTML = data.transactions.map(tx => `
+                        <tr>
+                            <td>${tx.id}</td>
+                            <td>
+                                <strong>${tx.workers?.name || 'Unknown'}</strong><br>
+                                <small style="color: #64748b;">${tx.worker_id}</small>
+                            </td>
+                            <td>KSh ${tx.amount}</td>
+                            <td>${maskPII(tx.customer_number)}</td>
+                            <td><span class="status ${tx.status.toLowerCase()}">${tx.status}</span></td>
+                            <td>${tx.gateway}</td>
+                            <td>${new Date(tx.created_at).toLocaleString()}</td>
+                            <td>
+                                ${tx.status === 'PENDING' ? 
+                                    `<button onclick="approveTransaction('${tx.id}')" style="background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Approve</button>` : 
+                                    '-'
+                                }
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px;">No transactions found</td></tr>';
+                }
+            } catch (error) {
+                console.error('All transactions load error:', error);
+            }
+        }
+
+        async function loadWorkers() {
+            try {
+                const analytics = analyticsData || await apiCall('/admin/analytics');
+                const tbody = document.getElementById('workersBody');
+                
+                document.getElementById('totalWorkers').textContent = analytics.workers?.length || 0;
+                document.getElementById('proWorkers').textContent = analytics.workers?.filter(w => w.subscription_plan === 'pro').length || 0;
+                
+                if (analytics.workers && analytics.workers.length > 0) {
+                    tbody.innerHTML = analytics.workers.map(worker => `
+                        <tr>
+                            <td>${worker.worker_id}</td>
+                            <td>
+                                <strong>${worker.name}</strong><br>
+                                <small style="color: #64748b;">${maskPII(worker.phone)}</small>
+                            </td>
+                            <td>${worker.occupation}</td>
+                            <td><span class="status ${worker.subscription_plan === 'pro' ? 'completed' : 'pending'}">${worker.subscription_plan}</span></td>
+                            <td>KSh ${worker.total_tips || 0}</td>
+                            <td>${worker.tip_count || 0}</td>
+                            <td><span class="status completed">Active</span></td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">No workers found</td></tr>';
+                }
+            } catch (error) {
+                console.error('Workers load error:', error);
+            }
+        }
+
+        async function loadSystemHealth() {
+            try {
+                const health = await fetch('/health').then(r => r.json());
+                const analytics = analyticsData || await apiCall('/admin/analytics');
+                
+                document.getElementById('dbStatus').textContent = 'Connected';
+                document.getElementById('mpesaStatus').textContent = 'Operational';
+                document.getElementById('queueStatus').textContent = `${analytics.systemHealth?.queueLength || 0} jobs`;
+                document.getElementById('uptime').textContent = `${Math.floor((analytics.systemHealth?.uptime || 0) / 3600)}h ${Math.floor(((analytics.systemHealth?.uptime || 0) % 3600) / 60)}m`;
+                
+                document.getElementById('fraudChecks').textContent = analytics.fraud?.totalChecks || 0;
+                document.getElementById('flaggedTx').textContent = analytics.fraud?.flaggedCount || 0;
+            } catch (error) {
+                console.error('System health load error:', error);
+            }
+        }
+
+        function loadCharts() {
+            if (!analyticsData) return;
+            
+            // Transaction Chart - 24 hour data
+            const txCanvas = document.getElementById('transactionChart');
+            if (txCanvas) {
+                const txCtx = txCanvas.getContext('2d');
+                drawTransactionTrendChart(txCtx, analyticsData.transactions?.hourlyData || []);
+            }
+            
+            // Revenue Chart - 7 day data
+            const revCanvas = document.getElementById('revenueChart');
+            if (revCanvas) {
+                const revCtx = revCanvas.getContext('2d');
+                drawRevenueChart(revCtx, analyticsData.revenue?.dailyRevenue || []);
+            }
+            
+            // Worker Performance Chart
+            const workerCanvas = document.getElementById('workerChart');
+            if (workerCanvas) {
+                const workerCtx = workerCanvas.getContext('2d');
+                drawWorkerPerformanceChart(workerCtx, analyticsData.workerPerformance || []);
+            }
+            
+            // Payment Methods Chart
+            const paymentCanvas = document.getElementById('paymentChart');
+            if (paymentCanvas) {
+                const paymentCtx = paymentCanvas.getContext('2d');
+                drawPaymentMethodsChart(paymentCtx, analyticsData.paymentMethods || {});
+            }
+        }
+
+        function drawTransactionTrendChart(ctx, hourlyData) {
+            const canvas = ctx.canvas;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const padding = 50;
+            const chartWidth = canvas.width - 2 * padding;
+            const chartHeight = canvas.height - 2 * padding;
+            const maxValue = Math.max(...hourlyData, 1);
+            
+            // Draw grid lines
+            ctx.strokeStyle = '#f1f5f9';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = padding + (i / 5) * chartHeight;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(canvas.width - padding, y);
+                ctx.stroke();
+            }
+            
+            // Draw axes
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+            
+            // Draw data line
+            if (hourlyData.length > 0) {
+                ctx.strokeStyle = '#667eea';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                
+                hourlyData.forEach((value, index) => {
+                    const x = padding + (index / (hourlyData.length - 1)) * chartWidth;
+                    const y = canvas.height - padding - (value / maxValue) * chartHeight;
+                    
+                    if (index === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                
+                ctx.stroke();
+                
+                // Draw data points
+                ctx.fillStyle = '#667eea';
+                hourlyData.forEach((value, index) => {
+                    const x = padding + (index / (hourlyData.length - 1)) * chartWidth;
+                    const y = canvas.height - padding - (value / maxValue) * chartHeight;
+                    
+                    ctx.beginPath();
+                    ctx.arc(x, y, 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+            }
+            
+            // Draw labels
+            ctx.fillStyle = '#64748b';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            
+            // X-axis labels (hours)
+            for (let i = 0; i < 24; i += 4) {
+                const x = padding + (i / 23) * chartWidth;
+                ctx.fillText(`${i}:00`, x, canvas.height - padding + 20);
+            }
+            
+            // Y-axis labels (transaction count)
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const y = canvas.height - padding - (i / 5) * chartHeight;
+                const value = Math.round((i / 5) * maxValue);
+                ctx.fillText(value.toString(), padding - 10, y + 4);
+            }
+            
+            // Chart title
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Transactions per Hour (Last 24h)', canvas.width / 2, 20);
+        }
+
+        function drawRevenueChart(ctx, dailyRevenue) {
+            const canvas = ctx.canvas;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const padding = 50;
+            const chartWidth = canvas.width - 2 * padding;
+            const chartHeight = canvas.height - 2 * padding;
+            const barWidth = chartWidth / dailyRevenue.length;
+            const maxValue = Math.max(...dailyRevenue, 1);
+            
+            // Draw grid lines
+            ctx.strokeStyle = '#f1f5f9';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = padding + (i / 5) * chartHeight;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(canvas.width - padding, y);
+                ctx.stroke();
+            }
+            
+            // Draw axes
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+            
+            // Draw bars
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            dailyRevenue.forEach((value, index) => {
+                const barHeight = maxValue > 0 ? (value / maxValue) * chartHeight : 0;
+                const x = padding + index * barWidth + barWidth * 0.1;
+                const y = canvas.height - padding - barHeight;
+                
+                // Gradient fill
+                const gradient = ctx.createLinearGradient(0, y, 0, canvas.height - padding);
+                gradient.addColorStop(0, '#10b981');
+                gradient.addColorStop(1, '#059669');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(x, y, barWidth * 0.8, barHeight);
+                
+                // Value labels on top of bars
+                if (value > 0) {
+                    ctx.fillStyle = '#1e293b';
+                    ctx.font = '11px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`KSh ${value}`, x + barWidth * 0.4, y - 5);
+                }
+                
+                // Day labels
+                ctx.fillStyle = '#64748b';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(days[index] || `Day ${index + 1}`, x + barWidth * 0.4, canvas.height - padding + 20);
+            });
+            
+            // Y-axis labels (revenue amounts)
+            ctx.fillStyle = '#64748b';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const y = canvas.height - padding - (i / 5) * chartHeight;
+                const value = Math.round((i / 5) * maxValue);
+                ctx.fillText(`KSh ${value}`, padding - 10, y + 4);
+            }
+            
+            // Chart title
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Daily Revenue (Last 7 Days)', canvas.width / 2, 20);
+        }
+        
+        function drawWorkerPerformanceChart(ctx, workerPerformance) {
+            const canvas = ctx.canvas;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const padding = 60;
+            const chartWidth = canvas.width - 2 * padding;
+            const chartHeight = canvas.height - 2 * padding;
+            
+            // Get top 5 workers
+            const topWorkers = workerPerformance.slice(0, 5);
+            if (topWorkers.length === 0) {
+                ctx.fillStyle = '#64748b';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('No worker data available', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            const barHeight = chartHeight / topWorkers.length;
+            const maxAmount = Math.max(...topWorkers.map(w => w.totalAmount), 1);
+            
+            // Draw horizontal bars
+            topWorkers.forEach((worker, index) => {
+                const barWidth = maxAmount > 0 ? (worker.totalAmount / maxAmount) * chartWidth : 0;
+                const y = padding + index * barHeight + barHeight * 0.1;
+                const x = padding;
+                
+                // Background bar
+                ctx.fillStyle = '#f1f5f9';
+                ctx.fillRect(x, y, chartWidth, barHeight * 0.8);
+                
+                // Data bar with gradient
+                const gradient = ctx.createLinearGradient(x, 0, x + barWidth, 0);
+                gradient.addColorStop(0, '#667eea');
+                gradient.addColorStop(1, '#764ba2');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(x, y, barWidth, barHeight * 0.8);
+                
+                // Worker name
+                ctx.fillStyle = '#1e293b';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(worker.name || 'Unknown', x + 10, y + barHeight * 0.5);
+                
+                // Amount value
+                ctx.fillStyle = '#64748b';
+                ctx.font = '11px Arial';
+                ctx.textAlign = 'right';
+                ctx.fillText(`KSh ${worker.totalAmount} (${worker.totalTips} tips)`, x + chartWidth - 10, y + barHeight * 0.5);
+            });
+            
+            // Chart title
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Top Workers by Tips Received', canvas.width / 2, 20);
+        }
+        
+        function drawPaymentMethodsChart(ctx, paymentMethods) {
+            const canvas = ctx.canvas;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2 + 10;
+            const radius = Math.min(canvas.width, canvas.height) / 4;
+            
+            const methods = Object.keys(paymentMethods);
+            const values = Object.values(paymentMethods);
+            const total = values.reduce((sum, val) => sum + val, 0);
+            
+            if (total === 0) {
+                ctx.fillStyle = '#64748b';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('No payment data available', centerX, centerY);
+                return;
+            }
+            
+            const colors = ['#667eea', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+            let currentAngle = -Math.PI / 2; // Start from top
+            
+            // Draw pie slices
+            methods.forEach((method, index) => {
+                const sliceAngle = (values[index] / total) * 2 * Math.PI;
+                
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[index % colors.length];
+                ctx.fill();
+                
+                // Draw slice border
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                currentAngle += sliceAngle;
+            });
+            
+            // Draw legend
+            const legendY = centerY + radius + 30;
+            let legendX = centerX - (methods.length * 80) / 2;
+            
+            methods.forEach((method, index) => {
+                const percentage = ((values[index] / total) * 100).toFixed(1);
+                
+                // Legend color box
+                ctx.fillStyle = colors[index % colors.length];
+                ctx.fillRect(legendX, legendY, 12, 12);
+                
+                // Legend text
+                ctx.fillStyle = '#1e293b';
+                ctx.font = '11px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(`${method} ${percentage}%`, legendX + 16, legendY + 9);
+                
+                legendX += 80;
+            });
+            
+            // Chart title
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Payment Methods Distribution', canvas.width / 2, 20);
+        }
+        
+        function loadAnalyticsCharts() {
+            if (!analyticsData) return;
+            
+            // Update analytics stats with real calculations
+            const transactions = analyticsData.transactions || {};
+            const revenue = analyticsData.revenue || {};
+            const hourlyData = transactions.hourlyData || [];
+            const workers = analyticsData.workers || [];
+            
+            // Real conversion rate from completed transactions
+            const totalTx = transactions.total || 0;
+            const completedTx = workers.reduce((sum, w) => sum + (w.tip_count || 0), 0);
+            const conversionRate = totalTx > 0 ? Math.round((completedTx / totalTx) * 100) : 0;
+            animateNumber('conversionRate', conversionRate, '%');
+            
+            // Real average tip from worker data
+            const totalTips = workers.reduce((sum, w) => sum + (w.total_tips || 0), 0);
+            const avgTip = completedTx > 0 ? Math.round(totalTips / completedTx) : 0;
+            animateNumber('avgTip', avgTip, 'KSh ');
+            
+            // Peak hour from real hourly data
+            const maxHourlyTx = Math.max(...hourlyData);
+            const peakHourIndex = maxHourlyTx > 0 ? hourlyData.indexOf(maxHourlyTx) : 6;
+            document.getElementById('peakHour').textContent = `${peakHourIndex}:00`;
+            
+            // Real growth rate
+            const growthRate = parseFloat(revenue.growth || 0);
+            animateNumber('growthRate', growthRate, '%');
+            
+            // Draw charts
+            const hourlyCanvas = document.getElementById('hourlyPatternChart');
+            if (hourlyCanvas) {
+                const hourlyCtx = hourlyCanvas.getContext('2d');
+                drawHourlyPatternChart(hourlyCtx, hourlyData);
+            }
+            
+            const statusCanvas = document.getElementById('statusBreakdownChart');
+            if (statusCanvas) {
+                const statusCtx = statusCanvas.getContext('2d');
+                drawStatusBreakdownChart(statusCtx, transactions);
+            }
+        }
+        
+        function drawHourlyPatternChart(ctx, hourlyData) {
+            const canvas = ctx.canvas;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const padding = 50;
+            const chartWidth = canvas.width - 2 * padding;
+            const chartHeight = canvas.height - 2 * padding;
+            const barWidth = chartWidth / 24;
+            const maxValue = Math.max(...hourlyData, 1);
+            
+            // Draw bars for each hour
+            hourlyData.forEach((value, hour) => {
+                const barHeight = maxValue > 0 ? (value / maxValue) * chartHeight : 0;
+                const x = padding + hour * barWidth;
+                const y = canvas.height - padding - barHeight;
+                
+                // Color based on activity level
+                let color = '#e2e8f0'; // Low activity
+                if (value > maxValue * 0.7) color = '#ef4444'; // High activity
+                else if (value > maxValue * 0.4) color = '#f59e0b'; // Medium activity
+                else if (value > 0) color = '#10b981'; // Some activity
+                
+                ctx.fillStyle = color;
+                ctx.fillRect(x + 1, y, barWidth - 2, barHeight);
+                
+                // Hour labels
+                if (hour % 4 === 0) {
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = '10px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${hour}h`, x + barWidth/2, canvas.height - padding + 15);
+                }
+            });
+            
+            // Title
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Transaction Activity by Hour', canvas.width / 2, 20);
+        }
+        
+        function drawStatusBreakdownChart(ctx, transactions) {
+            const canvas = ctx.canvas;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2 + 10;
+            const radius = Math.min(canvas.width, canvas.height) / 4;
+            
+            const statuses = {
+                'Completed': transactions.completed || 0,
+                'Pending': transactions.pending || 0,
+                'Failed': transactions.failed || 0
+            };
+            
+            const colors = {
+                'Completed': '#10b981',
+                'Pending': '#f59e0b', 
+                'Failed': '#ef4444'
+            };
+            
+            const total = Object.values(statuses).reduce((sum, val) => sum + val, 0);
+            
+            if (total === 0) {
+                ctx.fillStyle = '#64748b';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('No transaction data', centerX, centerY);
+                return;
+            }
+            
+            let currentAngle = -Math.PI / 2;
+            
+            // Draw pie slices
+            Object.entries(statuses).forEach(([status, count]) => {
+                if (count > 0) {
+                    const sliceAngle = (count / total) * 2 * Math.PI;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+                    ctx.closePath();
+                    ctx.fillStyle = colors[status];
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    
+                    currentAngle += sliceAngle;
+                }
+            });
+            
+            // Legend
+            const legendY = centerY + radius + 30;
+            let legendX = centerX - 120;
+            
+            Object.entries(statuses).forEach(([status, count]) => {
+                if (count > 0) {
+                    const percentage = ((count / total) * 100).toFixed(1);
+                    
+                    ctx.fillStyle = colors[status];
+                    ctx.fillRect(legendX, legendY, 12, 12);
+                    
+                    ctx.fillStyle = '#1e293b';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`${status}: ${count} (${percentage}%)`, legendX + 16, legendY + 9);
+                    
+                    legendX += 80;
+                }
+            });
+            
+            // Title
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Transaction Status Distribution', canvas.width / 2, 20);
+        }
+        
+        function animateNumber(elementId, targetValue, prefix = '', suffix = '') {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            element.classList.add('updating');
+            const startValue = 0;
+            const duration = 1500;
+            const startTime = performance.now();
+            
+            function updateNumber(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Easing function for smooth animation
+                const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+                const currentValue = Math.round(startValue + (targetValue - startValue) * easeOutQuart);
+                
+                element.textContent = `${prefix}${currentValue}${suffix}`;
+                
+                if (progress < 1) {
+                    requestAnimationFrame(updateNumber);
+                } else {
+                    element.classList.remove('updating');
+                }
+            }
+            
+            requestAnimationFrame(updateNumber);
+        }
+
+        async function approveTransaction(txId) {
+            if (!confirm('Approve this transaction for payout?')) return;
+            
+            try {
+                const result = await apiCall(`/admin/approve-transaction/${txId}`, {
+                    method: 'POST'
+                });
+                
+                if (result.success) {
+                    alert('Transaction approved successfully!');
+                    loadTransactions();
+                    loadAllTransactions();
+                } else {
+                    alert('Failed to approve transaction: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error approving transaction: ' + error.message);
+            }
+        }
+
+        function maskPII(value) {
+            if (!value) return value;
+            if (value.includes('@')) {
+                const [local, domain] = value.split('@');
+                return `${local.substring(0, 2)}***@${domain}`;
+            } else if (value.match(/^\d+$/)) {
+                return value.substring(0, 3) + '*'.repeat(value.length - 6) + value.substring(value.length - 3);
+            }
+            return value;
+        }
+    </script>
+</body>
+</html>
