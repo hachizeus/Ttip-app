@@ -25,9 +25,9 @@ export const sendNotification = async (userId, title, message, data = null, send
             .insert({
                 user_id: userId,
                 title,
-                body: message,
-                meta: data ? JSON.stringify(data) : null,
-                status: 'UNREAD',
+                message: message,
+                data: data ? JSON.stringify(data) : null,
+                status: 'unread',
                 created_at: new Date().toISOString()
             });
         
@@ -94,7 +94,7 @@ export const checkMilestones = async (workerId, newTotal, previousTotal) => {
 
 export const notifyTipReceived = async (workerId, amount, customerPhone) => {
     try {
-        // Get worker details
+        // Get worker details (get current total_tips which should be updated by now)
         const { data: worker } = await supabase
             .from('workers')
             .select('phone, name, total_tips')
@@ -103,8 +103,8 @@ export const notifyTipReceived = async (workerId, amount, customerPhone) => {
         
         if (!worker) return;
         
-        const previousTotal = worker.total_tips || 0;
-        const newTotal = previousTotal + amount;
+        const currentTotal = worker.total_tips || 0;
+        const previousTotal = currentTotal - amount; // Calculate previous total
         
         // Send tip notification
         await sendNotification(
@@ -114,13 +114,16 @@ export const notifyTipReceived = async (workerId, amount, customerPhone) => {
             {
                 type: 'tip_received',
                 amount,
-                customer_phone: customerPhone
+                customer_phone: customerPhone,
+                total_tips: currentTotal
             },
             true // Send SMS
         );
         
         // Check for milestones
-        await checkMilestones(workerId, newTotal, previousTotal);
+        await checkMilestones(workerId, currentTotal, previousTotal);
+        
+        console.log(`Tip notification sent to worker ${workerId}: KSh ${amount}`);
         
     } catch (error) {
         console.error('Error notifying tip received:', error);

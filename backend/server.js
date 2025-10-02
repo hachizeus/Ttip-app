@@ -820,6 +820,10 @@ async function handleMpesaCallback(req, res) {
                 // Send review request
                 await sendReviewSMS(phoneNumber, worker.name, transaction.id);
                 
+                // Send tip notification to worker
+                const { notifyTipReceived } = await import('./notifications-service.js');
+                await notifyTipReceived(transaction.worker_id, amount, phoneNumber);
+                
                 console.log(`✅ Payment processed successfully:`);
                 console.log(`- Transaction ID: ${transaction.id}`);
                 console.log(`- Worker: ${worker.name}`);
