@@ -45,6 +45,9 @@ if (missingEnvVars.length > 0) {
 
 const app = express();
 
+// Trust proxy for Render deployment
+app.set('trust proxy', 1);
+
 // Enhanced rate limiting
 const stkPushLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutes
@@ -642,7 +645,23 @@ const sendReviewSMS = async (customerPhone, workerName, transactionId) => {
 };
 
 // Enhanced C2B callback with commission and reviews
+app.post('/api/callback', async (req, res) => {
+    console.log('=== API CALLBACK RECEIVED ===');
+    console.log('Full request body:', JSON.stringify(req.body, null, 2));
+    console.log('Headers:', req.headers);
+    console.log('Timestamp:', new Date().toISOString());
+    
+    // Forward to the main callback handler
+    return handleMpesaCallback(req, res);
+});
+
+// Main callback handler (also keep the original endpoint)
 app.post('/mpesa/c2b-callback', async (req, res) => {
+    return handleMpesaCallback(req, res);
+});
+
+// Shared callback handler function
+async function handleMpesaCallback(req, res) {
     console.log('=== C2B CALLBACK RECEIVED ===');
     console.log('Full request body:', JSON.stringify(req.body, null, 2));
     console.log('Headers:', req.headers);
@@ -832,7 +851,7 @@ app.post('/mpesa/c2b-callback', async (req, res) => {
         console.error('C2B callback error:', error);
         res.json({ ResultCode: 1, ResultDesc: 'Error processing callback' });
     }
-});
+}
 
 // ===== PHASE 1 NEW ENDPOINTS =====
 
