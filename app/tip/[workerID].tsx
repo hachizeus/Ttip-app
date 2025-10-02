@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, Image } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { MaterialIcons } from '@expo/vector-icons'
 import { supabase, Worker } from '../../lib/supabase'
 import { initiateMpesaPayment } from '../../lib/mpesa'
 import { formatPhoneForAPI, validateKenyanPhone, formatPhoneForDisplay } from '../../lib/phone-utils'
@@ -11,6 +12,7 @@ import { OfflineStorage } from '../../lib/offline-storage'
 
 export default function TipScreen() {
   const { workerID, fromScanner } = useLocalSearchParams()
+  const router = useRouter()
   const [worker, setWorker] = useState<Worker | null>(null)
   const [amount, setAmount] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
@@ -140,6 +142,10 @@ export default function TipScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <MaterialIcons name="arrow-back" size={24} color="#333" />
+      </TouchableOpacity>
+      
       <View style={styles.header}>
         <Image source={require('../../assets/images/mylogo.png')} style={styles.logo} />
         <Text style={styles.title}>💰 Tip {worker.name}</Text>
@@ -216,10 +222,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   scrollContent: {
-    paddingTop: 30,
+    paddingTop: 70,
     paddingHorizontal: 20,
     paddingBottom: 30,
     flexGrow: 1,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 1,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 20,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   header: {
     alignItems: 'center',

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { MaterialIcons } from '@expo/vector-icons'
 import QRCode from 'react-native-qrcode-svg'
 import { supabase, Worker } from '../../lib/supabase'
+import ProfilePhoto from '../../components/ProfilePhoto'
 
 export default function WorkerProfile() {
   const { id } = useLocalSearchParams()
+  const router = useRouter()
   const [worker, setWorker] = useState<Worker | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -64,44 +67,38 @@ export default function WorkerProfile() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.title}>Welcome, {worker.name}!</Text>
+      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <MaterialIcons name="arrow-back" size={24} color="#333" />
+      </TouchableOpacity>
+      
+      <View style={styles.profileHeader}>
+        <ProfilePhoto 
+          photoUrl={worker.profile_image_url}
+          name={worker.name}
+          size={80}
+        />
+        <Text style={styles.title}>{worker.name}</Text>
+        <Text style={styles.occupation}>{worker.occupation}</Text>
+      </View>
       
       <View style={styles.infoCard}>
         <Text style={styles.label}>Worker ID: {worker.worker_id}</Text>
-        <Text style={styles.label}>Occupation: {worker.occupation}</Text>
-        <Text style={styles.label}>Plan: {worker.subscription_plan.toUpperCase()}</Text>
         <Text style={styles.label}>Total Tips: KSh {worker.total_tips}</Text>
         <Text style={styles.label}>Tip Count: {worker.tip_count}</Text>
       </View>
 
       <View style={styles.qrContainer}>
-        <Text style={styles.qrTitle}>Your QR Code</Text>
+        <Text style={styles.qrTitle}>{worker.name}'s QR Code</Text>
         <QRCode
-          value={worker.qr_code}
+          value={`https://ttip-app.onrender.com/tip/${worker.worker_id}`}
           size={200}
           backgroundColor="white"
           color="black"
         />
-        <Text style={styles.qrSubtitle}>Customers scan this to tip you</Text>
+        <Text style={styles.qrSubtitle}>Customers scan this to tip {worker.name}</Text>
       </View>
 
-      <View style={styles.subscriptionContainer}>
-        <Text style={styles.subscriptionTitle}>Upgrade Plan</Text>
-        <TouchableOpacity
-          style={styles.subscriptionButton}
-          onPress={() => handleSubscribe('lite')}
-        >
-          <Text style={styles.subscriptionText}>Lite Plan - KSh 50/month</Text>
-          <Text style={styles.subscriptionDesc}>Max tip: KSh 500</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.subscriptionButton}
-          onPress={() => handleSubscribe('pro')}
-        >
-          <Text style={styles.subscriptionText}>Pro Plan - KSh 150/month</Text>
-          <Text style={styles.subscriptionDesc}>Unlimited tips</Text>
-        </TouchableOpacity>
-      </View>
+
     </ScrollView>
   )
 }
@@ -116,11 +113,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 30,
   },
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 1,
+    padding: 8,
+  },
+  profileHeader: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 20,
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  occupation: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
   infoCard: {
     backgroundColor: '#f5f5f5',
@@ -146,28 +160,5 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 10,
   },
-  subscriptionContainer: {
-    marginTop: 20,
-  },
-  subscriptionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-  },
-  subscriptionButton: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  subscriptionText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  subscriptionDesc: {
-    color: '#fff',
-    fontSize: 14,
-    opacity: 0.8,
-  },
+
 })

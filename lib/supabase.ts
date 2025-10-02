@@ -17,6 +17,7 @@ export type Worker = {
   subscription_expiry: string | null
   total_tips: number
   tip_count: number
+  profile_image_url?: string
   created_at: string
 }
 

@@ -3,12 +3,17 @@ import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native'
 import { CameraView, Camera } from 'expo-camera'
 import { router } from 'expo-router'
 import { MaterialIcons } from '@expo/vector-icons'
+import NetInfo from '@react-native-community/netinfo'
 import { useTheme, ThemeProvider } from '../lib/theme-context'
+import OfflineTipModal from '../components/OfflineTipModal'
 
 function ScannerContent() {
   const { colors } = useTheme()
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [scanned, setScanned] = useState(false)
+  const [isOnline, setIsOnline] = useState(true)
+  const [showOfflineModal, setShowOfflineModal] = useState(false)
+  const [selectedWorker, setSelectedWorker] = useState<{id: string, name: string} | null>(null)
 
   useEffect(() => {
     const getCameraPermissions = async () => {
@@ -17,17 +22,51 @@ function ScannerContent() {
     }
 
     getCameraPermissions()
+    
+    // Network listener
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected ?? false)
+    })
+    
+    return () => unsubscribe()
   }, [])
 
-  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
+  const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
     if (scanned) return // Prevent multiple scans
     setScanned(true)
     
+    try {
+      // Try to parse as enhanced QR code first
+      const qrData = JSON.parse(data)
+      if (qrData.workerId && qrData.workerName) {
+        // Enhanced offline QR code
+        setSelectedWorker({ id: qrData.workerId, name: qrData.workerName })
+        setShowOfflineModal(true)
+        return
+      }
+    } catch {
+      // Not JSON, try URL parsing
+    }
+    
     // Extract worker ID from QR code data
-    const workerIdMatch = data.match(/\/tip\/([^\/\?]+)/)
+    let workerIdMatch = data.match(/\/tip\/([^\/\?]+)/)
+    let workerId = null
+    
     if (workerIdMatch) {
-      const workerId = workerIdMatch[1]
-      router.push(`/tip/${workerId}`)
+      workerId = workerIdMatch[1]
+    } else {
+      // Try ttip:// protocol format
+      const ttipMatch = data.match(/ttip:\/\/offline-tip\/([^\?]+)/)
+      if (ttipMatch) {
+        workerId = ttipMatch[1]
+      }
+    }
+    
+    if (workerId) {
+      console.log('🔍 Found workerId:', workerId, 'isOnline:', isOnline)
+      // Always show offline modal for better control
+      setSelectedWorker({ id: workerId, name: 'Worker' })
+      setShowOfflineModal(true)
     } else {
       // Handle any other QR code - show content and allow user to decide
       Alert.alert(
@@ -86,6 +125,12 @@ function ScannerContent() {
             <Text style={styles.subInstruction}>
               The code will be scanned automatically
             </Text>
+            {!isOnline && (
+              <View style={styles.offlineIndicator}>
+                <MaterialIcons name="wifi-off" size={16} color="#ff9800" />
+                <Text style={styles.offlineText}>Offline Mode</Text>
+              </View>
+            )}
           </View>
           
           {scanned && (
@@ -98,6 +143,21 @@ function ScannerContent() {
           )}
         </View>
       </CameraView>
+      
+      {selectedWorker && (
+        <OfflineTipModal
+          visible={showOfflineModal}
+          onClose={() => {
+            console.log('🚪 Closing modal')
+            setShowOfflineModal(false)
+            setSelectedWorker(null)
+            setScanned(false)
+          }}
+          workerId={selectedWorker.id}
+          workerName={selectedWorker.name}
+          isOnline={isOnline}
+        />
+      )}
     </View>
   )
 }
@@ -218,5 +278,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  offlineIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 152, 0, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 16,
+  },
+  offlineText: {
+    color: '#ff9800',
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 4,
   },
 })

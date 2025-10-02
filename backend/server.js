@@ -96,6 +96,7 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '1mb' })); // Reduced from 10mb
 app.use('/assets', express.static(path.join(process.cwd(), '../assets')));
+app.use(express.static(path.join(process.cwd(), '../public')));
 app.use(cors({
     origin: process.env.FRONTEND_URL || 'https://ttip-app.onrender.com',
     credentials: true,
@@ -1055,6 +1056,28 @@ app.get('/join/:referralCode', async (req, res) => {
     }
 });
 
+// PWA Worker API endpoint
+app.get('/api/worker/:workerId', async (req, res) => {
+    const { workerId } = req.params;
+    
+    try {
+        const { data: worker, error } = await supabase
+            .from('workers')
+            .select('*')
+            .eq('worker_id', workerId)
+            .single();
+        
+        if (error || !worker) {
+            return res.status(404).json({ error: 'Worker not found' });
+        }
+        
+        res.json(worker);
+    } catch (error) {
+        console.error('Worker API error:', error);
+        res.status(500).json({ error: 'Failed to fetch worker' });
+    }
+});
+
 // Get worker referral stats
 app.get('/api/referral-stats/:workerId', async (req, res) => {
     const { workerId } = req.params;
@@ -1433,6 +1456,27 @@ app.get('/api/commission-stats', adminLimiter, requireAdminAuth, async (req, res
 
 // ===== PHASE 2 ENDPOINTS =====
 
+// Leaderboard endpoint
+app.get('/api/leaderboard', async (req, res) => {
+    try {
+        const { data: workers, error } = await supabase
+            .from('workers')
+            .select('id, worker_id, name, occupation, total_tips, tip_count, profile_photo_url')
+            .order('total_tips', { ascending: false })
+            .limit(20);
+        
+        if (error) {
+            return res.status(500).json({ error: 'Failed to fetch leaderboard' });
+        }
+        
+        res.json({ workers: workers || [] });
+        
+    } catch (error) {
+        console.error('Leaderboard error:', error);
+        res.status(500).json({ error: 'Failed to fetch leaderboard' });
+    }
+});
+
 // API tip route for mobile app
 app.get('/api/tip/:workerId', async (req, res) => {
     const { workerId } = req.params;
@@ -1466,7 +1510,7 @@ app.get('/api/workers', async (req, res) => {
     try {
         const { data: workers, error } = await supabase
             .from('workers')
-            .select('worker_id, name, occupation, total_tips, tip_count')
+            .select('worker_id, name, occupation, total_tips, tip_count, profile_photo_url')
             .order('name');
         
         if (error) {

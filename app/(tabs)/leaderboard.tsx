@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native'
+import { useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { useTheme } from '../../lib/theme-context'
 import { MaterialIcons } from '@expo/vector-icons'
 import { fonts, fontWeights } from '../../lib/fonts'
+import ProfilePhoto from '../../components/ProfilePhoto'
 
 interface Worker {
   id: string
+  worker_id: string
   name: string
   occupation: string
   total_tips: number
   tip_count: number
+  profile_image_url?: string
 }
 
 export default function LeaderboardScreen() {
   const { colors } = useTheme()
+  const router = useRouter()
   const [workers, setWorkers] = useState<Worker[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -26,7 +31,7 @@ export default function LeaderboardScreen() {
     try {
       const { data, error } = await supabase
         .from('workers')
-        .select('id, name, occupation, total_tips, tip_count')
+        .select('id, worker_id, name, occupation, total_tips, tip_count, profile_image_url')
         .order('total_tips', { ascending: false })
         .limit(20)
 
@@ -37,6 +42,10 @@ export default function LeaderboardScreen() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleProfilePress = (worker: Worker) => {
+    router.push(`/worker/${worker.worker_id}`)
   }
 
   const getRankEmoji = (index: number) => {
@@ -61,28 +70,39 @@ export default function LeaderboardScreen() {
         }
       >
         {workers.map((worker, index) => (
-          <View key={worker.id} style={[
-            styles.workerCard, 
-            { backgroundColor: colors.card },
-            index < 3 && styles.topThreeCard
-          ]}>
-            <View style={styles.rank}>
-              <Text style={styles.rankText}>
-                {getRankEmoji(index)}
-              </Text>
-            </View>
+          <TouchableOpacity 
+            key={worker.id} 
+            style={[
+              styles.workerCard, 
+              { backgroundColor: colors.card },
+              index < 3 && styles.topThreeCard
+            ]}
+            onPress={() => handleProfilePress(worker)}
+            activeOpacity={0.7}
+          >
+            <TouchableOpacity 
+              style={styles.profilePhotoContainer}
+              onPress={() => handleProfilePress(worker)}
+              activeOpacity={0.8}
+            >
+              <ProfilePhoto 
+                photoUrl={worker.profile_image_url}
+                name={worker.name}
+                rank={index + 1}
+                size={45}
+              />
+            </TouchableOpacity>
             
             <View style={styles.workerInfo}>
               <Text style={[styles.workerName, { color: colors.text }]}>{worker.name}</Text>
               <Text style={[styles.workerOccupation, { color: colors.textSecondary }]}>{worker.occupation}</Text>
-
             </View>
             
             <View style={styles.stats}>
               <Text style={styles.totalTips}>KSh {worker.total_tips.toLocaleString()}</Text>
               <Text style={[styles.tipCount, { color: colors.textSecondary }]}>{worker.tip_count} tips</Text>
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
         
         {workers.length === 0 && !loading && (
@@ -135,15 +155,12 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  rank: {
-    width: 35,
-    alignItems: 'center',
+  profilePhotoContainer: {
     marginRight: 12,
   },
-  rankText: {
-    fontSize: 16,
-    fontFamily: fonts.bold,
-    fontWeight: fontWeights.bold,
+  topThreeCard: {
+    borderWidth: 1,
+    borderColor: '#ffd700',
   },
   workerInfo: {
     flex: 1,
