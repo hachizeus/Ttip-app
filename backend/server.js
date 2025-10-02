@@ -1,18 +1,18 @@
-import express from 'express';
-import cors from 'cors';
-import path from 'path';
-import { configDotenv } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
-import { initiateMpesaPayment } from './enhanced-daraja.mjs';
-import { generateQRCode, getWorkerQR } from './qr-service.js';
-import { enqueuePayout, getQueueStatus } from './payment-queue.js';
-import { processCompletedTransaction, submitCustomerReview } from './reviews-service.js';
-import { createTeam, inviteWorkerToTeam, acceptTeamInvite, getTeamStats } from './teams-service.js';
-import { sendNotification, notifyTipReceived, getWorkerNotifications, markNotificationRead } from './notifications-service.js';
-import { requireAdminAuth } from './admin-auth.js';
+import cors from 'cors';
+import crypto from 'crypto';
+import { configDotenv } from 'dotenv';
+import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import crypto from 'crypto';
+import path from 'path';
+import { requireAdminAuth } from './admin-auth.js';
+import { initiateMpesaPayment } from './enhanced-daraja.mjs';
+import { getWorkerNotifications, markNotificationRead } from './notifications-service.js';
+import { enqueuePayout, getQueueStatus } from './payment-queue.js';
+import { generateQRCode, getWorkerQR } from './qr-service.js';
+import { submitCustomerReview } from './reviews-service.js';
+import { acceptTeamInvite, createTeam, getTeamStats, inviteWorkerToTeam } from './teams-service.js';
 
 // HTML escaping function to prevent XSS
 const escapeHtml = (unsafe) => {
@@ -2158,6 +2158,37 @@ app.get('/api/payment-status', async (req, res) => {
         let effectiveStatus = transaction?.status || 'PENDING';
         if (transaction?.mpesa_tx_id && effectiveStatus === 'PENDING') {
             effectiveStatus = 'COMPLETED';
+        }
+        
+        // If still pending after 30 seconds, try querying M-Pesa directly
+        if (effectiveStatus === 'PENDING' && transaction) {
+            const transactionAge = Date.now() - new Date(transaction.created_at).getTime();
+            if (transactionAge > 30000) { // 30 seconds
+                try {
+                    // Try to import and use query function
+                    const { queryPaymentStatus } = await import('./enhanced-daraja.mjs');
+                    const queryResult = await queryPaymentStatus(checkoutRequestId);
+                    
+                    if (queryResult.status === 'SUCCESS') {
+                        // Update transaction immediately
+                        await supabase
+                            .from('transactions')
+                            .update({ 
+                                mpesa_tx_id: 'QUERY_SUCCESS',
+                                commission_amount: 0,
+                                worker_payout: transaction.amount
+                            })
+                            .eq('id', transaction.id);
+                        
+                        effectiveStatus = 'COMPLETED';
+                    } else if (queryResult.status === 'FAILED') {
+                        effectiveStatus = 'FAILED';
+                    }
+                    // If still PENDING from query, keep checking
+                } catch (queryError) {
+                    console.log('Query failed:', queryError.message);
+                }
+            }
         }
         
         res.json({ 

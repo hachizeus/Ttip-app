@@ -122,3 +122,41 @@ export const initiateB2CPayment = async (phoneNumber, amount, remarks = 'Tip pay
     console.log('B2C Response:', response.data);
     return response.data;
 };
+
+export const queryPaymentStatus = async (checkoutRequestId) => {
+    console.log('=== Querying Payment Status ===');
+    
+    const accessToken = await getAccessToken();
+    const shortcode = process.env.SHORT_CODE;
+    const passkey = process.env.PASSKEY;
+    const timestamp = new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14);
+    const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
+
+    const payload = {
+        BusinessShortCode: shortcode,
+        Password: password,
+        Timestamp: timestamp,
+        CheckoutRequestID: checkoutRequestId
+    };
+    
+    try {
+        const response = await axios.post(`${baseURL}/mpesa/stkpushquery/v1/query`, payload, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            }
+        });
+        
+        console.log('Query response:', response.data);
+        
+        if (response.data.ResultCode === '0') {
+            return { status: 'SUCCESS', data: response.data };
+        } else if (response.data.ResultCode === '4999') {
+            return { status: 'PENDING', data: response.data };
+        } else {
+            return { status: 'FAILED', data: response.data };
+        }
+    } catch (error) {
+        console.error('Query error:', error.message);
+        return { status: 'PENDING', error: error.message };
+    }
+};
