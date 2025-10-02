@@ -57,7 +57,7 @@ export const initiateMpesaPayment = async (phoneNumber, amount, accountReference
         PartyA: phoneNumber,
         PartyB: shortcode,
         PhoneNumber: phoneNumber,
-        CallBackURL: 'https://ttip-app.onrender.com/api/callback',
+        CallBackURL: process.env.CALLBACK_URL || 'http://localhost:3000/mpesa/c2b-callback',
         AccountReference: accountReference,
         TransactionDesc: `Pay KSh ${amount} through TTip to worker`,
     };
