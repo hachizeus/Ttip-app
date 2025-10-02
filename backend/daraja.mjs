@@ -23,6 +23,23 @@ export const initiateMpesaPayment = async (phoneNumber, amount) => {
     const shortcode = process.env.SHORT_CODE;
     const passkey = process.env.PASSKEY;
 
+    // Format phone number properly for M-Pesa (handle 10-digit input)
+    let formattedPhone = phoneNumber.toString().replace(/\D/g, ''); // Remove non-digits
+    
+    if (formattedPhone.startsWith('0') && formattedPhone.length === 10) {
+        formattedPhone = '254' + formattedPhone.substring(1); // Replace leading 0 with 254
+    } else if (formattedPhone.startsWith('254') && formattedPhone.length === 12) {
+        // Already in correct format
+    } else if ((formattedPhone.startsWith('7') || formattedPhone.startsWith('1')) && formattedPhone.length === 9) {
+        formattedPhone = '254' + formattedPhone; // Add 254 prefix for 9-digit
+    } else if ((formattedPhone.startsWith('7') || formattedPhone.startsWith('1')) && formattedPhone.length === 10) {
+        formattedPhone = '254' + formattedPhone; // Add 254 prefix for 10-digit without leading 0
+    } else if (formattedPhone.length === 10 && !formattedPhone.startsWith('0')) {
+        formattedPhone = '254' + formattedPhone; // Handle any 10-digit number
+    }
+    
+    console.log(`Original phone: ${phoneNumber}, Formatted: ${formattedPhone}`);
+
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
 
     const payload = {
@@ -30,10 +47,10 @@ export const initiateMpesaPayment = async (phoneNumber, amount) => {
         Password: password,
         Timestamp: timestamp,
         TransactionType: 'CustomerPayBillOnline',
-        Amount: amount,
-        PartyA: phoneNumber,
+        Amount: parseInt(amount),
+        PartyA: formattedPhone,
         PartyB: shortcode,
-        PhoneNumber: phoneNumber,
+        PhoneNumber: formattedPhone,
         CallBackURL: process.env.CALLBACK_URL,
         AccountReference: 'TTip',
         TransactionDesc: 'Payment for services',

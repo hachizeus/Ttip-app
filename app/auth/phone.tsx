@@ -2,14 +2,18 @@ import React, { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { router } from 'expo-router'
 import { sendOTP } from '../../lib/auth'
+import { validateKenyanPhone } from '../../lib/phone-utils'
 
 export default function PhoneScreen() {
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleSendOTP = async () => {
-    if (phone.length !== 10 || !phone.startsWith('0')) {
-      Alert.alert('Error', 'Enter valid phone number (0712345678)')
+    const cleaned = phone.replace(/\D/g, '') // Remove non-digits
+    
+    // Validate using the utility function
+    if (!validateKenyanPhone(phone)) {
+      Alert.alert('Error', 'Enter valid phone number (e.g., 712345678 or 0712345678)')
       return
     }
 
@@ -27,11 +31,11 @@ export default function PhoneScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Enter Phone Number</Text>
-      <Text style={styles.subtitle}>We'll send you a verification code</Text>
+      <Text style={styles.subtitle}>Enter your 10-digit phone number (without country code)</Text>
       
       <TextInput
         style={styles.input}
-        placeholder="0712345678"
+        placeholder="712345678"
         value={phone}
         onChangeText={setPhone}
       />

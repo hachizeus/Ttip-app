@@ -7,7 +7,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import path from 'path';
 import { requireAdminAuth } from './admin-auth.js';
-import { initiateMpesaPayment } from './enhanced-daraja.mjs';
+import { initiateMpesaPayment } from './daraja.mjs';
 import { getWorkerNotifications, markNotificationRead } from './notifications-service.js';
 import { enqueuePayout, getQueueStatus } from './payment-queue.js';
 import { generateQRCode, getWorkerQR } from './qr-service.js';
@@ -553,6 +553,13 @@ app.post('/api/stk-push', async (req, res) => {
             });
         }
         
+        // Additional validation for test numbers
+        if (formattedPhone === '254708374149') {
+            console.log('✅ Using Daraja test number');
+        } else {
+            console.log('⚠️ Using real phone number:', formattedPhone);
+        }
+        
         const stkResponse = await initiateMpesaPayment(formattedPhone, amount, workerId);
         
         console.log('M-Pesa STK Response:', JSON.stringify(stkResponse, null, 2));
@@ -580,9 +587,22 @@ app.post('/api/stk-push', async (req, res) => {
             });
         } else {
             console.log('❌ STK Push failed:', stkResponse);
+            
+            // Provide specific error messages for common issues
+            let errorMessage = stkResponse.ResponseDescription || 'STK Push failed';
+            
+            if (stkResponse.ResponseCode === '1') {
+                errorMessage = 'Invalid phone number. Please use a valid Safaricom number.';
+            } else if (stkResponse.ResponseCode === '1037') {
+                errorMessage = 'Request timeout. Please ensure your phone is on and has network coverage.';
+            } else if (stkResponse.ResponseCode === '1032') {
+                errorMessage = 'Request cancelled by user.';
+            }
+            
             res.json({ 
                 success: false, 
-                error: stkResponse.ResponseDescription || 'STK Push failed',
+                error: errorMessage,
+                code: stkResponse.ResponseCode,
                 details: stkResponse
             });
         }
@@ -2256,7 +2276,7 @@ app.listen(PORT, () => {
     console.log('Phase 1: Commission System, Referral Program, Review System');
     console.log('Phase 2: Analytics, Forecasting, Recurring Tips, Marketing');
     console.log('Phase 3: Marketplace, Social Features, Loyalty, Gamification');
-    console.log('📊 Analytics Dashboard: http://localhost:3000/analytics-dashboard.html');
-    console.log('🏪 Marketplace: http://localhost:3000/marketplace-dashboard.html');
+    console.log('📊 Analytics Dashboard: https://ttip-app.onrender.com/analytics-dashboard.html');
+    console.log('🏪 Marketplace: https://ttip-app.onrender.com/marketplace-dashboard.html');
     console.log('Ready for testing!');
 });

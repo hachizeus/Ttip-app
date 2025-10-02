@@ -1,13 +1,5 @@
-// Phone number utility functions
-export const formatPhoneForDisplay = (phone: string): string => {
-  // Convert +254712345678 to 0712345678 for display
-  if (phone.startsWith('+254')) {
-    return '0' + phone.substring(4)
-  }
-  return phone
-}
-
-export const formatPhoneForAPI = (phone: string): string => {
+// Test the updated phone number formatting
+const formatPhoneForAPI = (phone) => {
   // Convert phone number to 254XXXXXXXXX format for APIs
   const cleaned = phone.replace(/\D/g, '') // Remove non-digits
   
@@ -39,13 +31,7 @@ export const formatPhoneForAPI = (phone: string): string => {
   return '254' + cleaned
 }
 
-export const formatPhoneForSMS = (phone: string): string => {
-  // Convert to +254712345678 for SMS
-  const apiFormat = formatPhoneForAPI(phone)
-  return '+' + apiFormat
-}
-
-export const validateKenyanPhone = (phone: string): boolean => {
+const validateKenyanPhone = (phone) => {
   // Validate Kenyan phone number format
   const cleaned = phone.replace(/\D/g, '') // Remove non-digits
   
@@ -71,3 +57,24 @@ export const validateKenyanPhone = (phone: string): boolean => {
   
   return false
 }
+
+// Test cases
+const testCases = [
+  '712345678',    // 9-digit without leading 0
+  '7123456789',   // 10-digit starting with 7
+  '1123456789',   // 10-digit starting with 1
+  '0712345678',   // Traditional format with 0
+  '254712345678', // Full international format
+  '712 345 678',  // With spaces
+  '+254712345678' // With + prefix
+]
+
+console.log('=== Phone Number Formatting Test ===')
+testCases.forEach(phone => {
+  const isValid = validateKenyanPhone(phone)
+  const formatted = formatPhoneForAPI(phone)
+  console.log(`Input: ${phone.padEnd(15)} | Valid: ${isValid.toString().padEnd(5)} | Formatted: ${formatted}`)
+})
+
+console.log('\n=== Expected Results ===')
+console.log('All should format to 254XXXXXXXXX and be valid (except invalid formats)')
