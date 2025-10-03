@@ -567,17 +567,17 @@ app.post('/api/stk-push', async (req, res) => {
         
         if (stkResponse.ResponseCode === '0') {
             const { error: txError } = await supabase
-                .from('transactions')
+                .from('tips')
                 .insert({
                     worker_id: workerId,
-                    customer_number: formattedPhone,
+                    customer_phone: formattedPhone,
                     amount: amount,
-                    status: 'PENDING',
+                    status: 'pending',
                     gateway: 'daraja',
                     raw_payload: stkResponse
                 });
             
-            if (txError) console.error('Transaction record error:', txError);
+            if (txError) console.error('Tip record error:', txError);
             
             console.log('✅ STK Push sent successfully, CheckoutRequestID:', stkResponse.CheckoutRequestID);
             
@@ -705,47 +705,47 @@ async function handleMpesaCallback(req, res) {
                 
                 console.log('Payment metadata:', { amount, mpesaReceiptNumber, phoneNumber });
                 
-                // Find transaction by CheckoutRequestID stored in raw_payload
-                const { data: transactions, error: searchError } = await supabase
-                    .from('transactions')
+                // Find tip by CheckoutRequestID stored in raw_payload
+                const { data: tips, error: searchError } = await supabase
+                    .from('tips')
                     .select('*')
-                    .eq('status', 'PENDING')
+                    .eq('status', 'pending')
                     .order('created_at', { ascending: false })
                     .limit(20);
                 
-                console.log(`Found ${transactions?.length || 0} pending transactions`);
+                console.log(`Found ${tips?.length || 0} pending tips`);
                 
-                let transaction = null;
+                let tip = null;
                 
-                // Search through transactions to find matching CheckoutRequestID
-                if (transactions) {
-                    for (const tx of transactions) {
-                        const rawPayload = tx.raw_payload;
+                // Search through tips to find matching CheckoutRequestID
+                if (tips) {
+                    for (const t of tips) {
+                        const rawPayload = t.raw_payload;
                         if (rawPayload && 
                             (rawPayload.CheckoutRequestID === CheckoutRequestID ||
                              JSON.stringify(rawPayload).includes(CheckoutRequestID))) {
-                            transaction = tx;
-                            console.log(`Found matching transaction: ${tx.id}`);
+                            tip = t;
+                            console.log(`Found matching tip: ${t.id}`);
                             break;
                         }
                     }
                 }
                 
-                if (!transaction) {
-                    console.error('❌ Transaction not found for CheckoutRequestID:', CheckoutRequestID);
+                if (!tip) {
+                    console.error('❌ Tip not found for CheckoutRequestID:', CheckoutRequestID);
                     
-                    // Log recent transactions for debugging
-                    const { data: recentTx } = await supabase
-                        .from('transactions')
+                    // Log recent tips for debugging
+                    const { data: recentTips } = await supabase
+                        .from('tips')
                         .select('id, worker_id, amount, status, created_at, raw_payload')
                         .order('created_at', { ascending: false })
                         .limit(5);
                     
-                    console.log('Recent transactions:', recentTx?.map(tx => ({
-                        id: tx.id,
-                        checkoutId: tx.raw_payload?.CheckoutRequestID,
-                        status: tx.status,
-                        created: tx.created_at
+                    console.log('Recent tips:', recentTips?.map(t => ({
+                        id: t.id,
+                        checkoutId: t.raw_payload?.CheckoutRequestID,
+                        status: t.status,
+                        created: t.created_at
                     })));
                     
                     return res.json({ ResultCode: 0, ResultDesc: 'Success' });
@@ -755,11 +755,11 @@ async function handleMpesaCallback(req, res) {
                 const { data: worker } = await supabase
                     .from('workers')
                     .select('name, phone')
-                    .eq('worker_id', transaction.worker_id)
+                    .eq('worker_id', tip.worker_id)
                     .single();
                 
                 if (!worker) {
-                    console.error('❌ Worker not found for worker_id:', transaction.worker_id);
+                    console.error('❌ Worker not found for worker_id:', tip.worker_id);
                     return res.json({ ResultCode: 0, ResultDesc: 'Success' });
                 }
                 
@@ -771,62 +771,44 @@ async function handleMpesaCallback(req, res) {
                 
                 console.log('Commission calculation:', { workerPayout, commission, usedReferralCredit });
                 
-                // Update transaction with commission info (update fields separately to avoid constraint issues)
+                // Update tip with commission info
                 await supabase
-                    .from('transactions')
+                    .from('tips')
                     .update({
-                        mpesa_tx_id: mpesaReceiptNumber,
+                        mpesa_receipt: mpesaReceiptNumber,
                         commission_amount: commission,
                         worker_payout: workerPayout,
                         used_referral_credit: usedReferralCredit,
-                        raw_payload: { ...transaction.raw_payload, callback: Body.stkCallback }
+                        raw_payload: { ...tip.raw_payload, callback: Body.stkCallback }
                     })
-                    .eq('id', transaction.id);
+                    .eq('id', tip.id);
                 
                 // Update status separately
                 const { error: statusError } = await supabase
-                    .from('transactions')
-                    .update({ status: 'COMPLETED' })
-                    .eq('id', transaction.id);
+                    .from('tips')
+                    .update({ status: 'completed' })
+                    .eq('id', tip.id);
                 
                 const updateError = statusError; // For logging compatibility
                 
                 if (updateError) {
-                    console.error('Transaction update error:', updateError);
+                    console.error('Tip update error:', updateError);
                 } else {
-                    console.log('✅ Transaction updated successfully');
+                    console.log('✅ Tip updated successfully');
                 }
                 
-                // Update worker stats
-                const { data: currentWorker } = await supabase
-                    .from('workers')
-                    .select('total_tips, tip_count')
-                    .eq('worker_id', transaction.worker_id)
-                    .single();
-                
-                const { error: workerUpdateError } = await supabase
-                    .from('workers')
-                    .update({
-                        total_tips: (currentWorker?.total_tips || 0) + workerPayout,
-                        tip_count: (currentWorker?.tip_count || 0) + 1
-                    })
-                    .eq('worker_id', transaction.worker_id);
-                
-                if (workerUpdateError) {
-                    console.error('Worker stats update error:', workerUpdateError);
-                } else {
-                    console.log('✅ Worker stats updated successfully');
-                }
+                // Worker stats will be updated automatically by trigger
+                console.log('✅ Worker stats will be updated by trigger');
                 
                 // Send review request
                 await sendReviewSMS(phoneNumber, worker.name, transaction.id);
                 
                 // Send tip notification to worker
                 const { notifyTipReceived } = await import('./notifications-service.js');
-                await notifyTipReceived(transaction.worker_id, amount, phoneNumber);
+                await notifyTipReceived(tip.worker_id, amount, phoneNumber);
                 
                 console.log(`✅ Payment processed successfully:`);
-                console.log(`- Transaction ID: ${transaction.id}`);
+                console.log(`- Tip ID: ${tip.id}`);
                 console.log(`- Worker: ${worker.name}`);
                 console.log(`- Amount: ${amount}`);
                 console.log(`- Worker payout: ${workerPayout}`);

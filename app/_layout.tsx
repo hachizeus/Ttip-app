@@ -23,6 +23,7 @@ import { NotificationProvider } from '../lib/notification-context';
 // import { PushNotifications } from '../lib/push-notifications';
 import { Analytics } from '../lib/analytics';
 import { PerformanceMonitor } from '../lib/performance-monitor';
+import BackgroundSync from '../lib/background-sync';
 
 
 export default function RootLayout() {
@@ -51,6 +52,14 @@ export default function RootLayout() {
     DeepLinking.init();
     Analytics.init();
     PerformanceMonitor.trackMemoryUsage();
+    
+    // Initialize background sync for offline tips
+    const backgroundSync = BackgroundSync.getInstance();
+    
+    // Force check for pending tips after a delay
+    setTimeout(() => {
+      backgroundSync.checkPendingTipsOnStartup();
+    }, 3000);
 
     // Check user status when app becomes active
     const handleAppStateChange = (nextAppState: string) => {

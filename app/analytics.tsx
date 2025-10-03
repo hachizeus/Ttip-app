@@ -61,6 +61,7 @@ export default function AnalyticsScreen() {
           return tipDate.toDateString() === date.toDateString()
         })
         const dayTotal = dayTips.reduce((sum, tip) => sum + (parseFloat(tip.amount) || 0), 0)
+        console.log(`📅 ${date.toDateString()}: ${dayTips.length} tips = ${dayTotal} KSh`)
         
         labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
         data.push(dayTotal)
@@ -82,6 +83,8 @@ export default function AnalyticsScreen() {
       }
     }
     
+    console.log('📈 Final chart data:', { labels, data })
+    
     setChartData({
       labels,
       datasets: [{
@@ -99,11 +102,13 @@ export default function AnalyticsScreen() {
 
       const { data: worker } = await supabase
         .from('workers')
-        .select('worker_id')
+        .select('worker_id, total_tips, tip_count')
         .eq('phone', phone)
         .single()
 
       if (!worker) return
+      
+      console.log('📊 Analytics worker data:', worker)
 
       let startDate, endDate
       
@@ -124,18 +129,34 @@ export default function AnalyticsScreen() {
         startDate.setFullYear(startDate.getFullYear() - 1)
       }
 
-      const { data: tips } = await supabase
-        .from('tips')
+      // Get all transactions that are actually completed (have mpesa_tx_id)
+      const { data: allTransactions } = await supabase
+        .from('transactions')
         .select('*')
         .eq('worker_id', worker.worker_id)
-        .eq('status', 'completed')
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString())
-        .order('created_at', { ascending: true })
+        .not('mpesa_tx_id', 'is', null)
+        .order('created_at', { ascending: false })
+      
+      console.log('📊 All transactions for worker:', allTransactions?.length || 0)
+      console.log('📊 Sample transactions:', allTransactions?.slice(0, 3))
+      
+      // Filter by date range
+      const tips = (allTransactions || []).filter(tx => {
+        const txDate = new Date(tx.created_at)
+        return txDate >= startDate && txDate <= endDate
+      })
+      
+      console.log('📊 Filtered tips in date range:', tips.length)
+      console.log('📊 Date range:', startDate.toISOString(), 'to', endDate.toISOString())
 
       if (tips) {
         const total = tips.reduce((sum, tip) => sum + (parseFloat(tip.amount) || 0), 0)
-        setTotalAmount(total)
+        console.log('📊 Analytics calculated total:', total, 'vs worker.total_tips:', worker.total_tips)
+        console.log('📊 Tips found:', tips.length, 'transactions')
+        
+        // Use the actual database total_tips value for accuracy
+        setTotalAmount(worker.total_tips || total)
+        console.log('📈 Chart data - tips for chart:', tips.map(t => ({ amount: t.amount, date: t.created_at })))
         generateChartData(tips, startDate, endDate)
         setTipHistory(tips.map(tip => ({
           ...tip,

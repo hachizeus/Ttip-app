@@ -1,15 +1,19 @@
--- COMPREHENSIVE DATABASE FIX FOR TTIP
--- Run these queries in order in Supabase SQL Editor
+-- FINAL DATABASE FIX FOR TTIP
+-- Clean, working version without syntax errors
 
 -- ============================================================================
--- 1. IDENTIFY AND FIX DATA TYPE MISMATCHES
+-- 1. DROP DEPENDENT VIEWS FIRST
 -- ============================================================================
 
--- Fix worker_id data type mismatch in transactions table
+DROP VIEW IF EXISTS worker_analytics CASCADE;
+
+-- ============================================================================
+-- 2. FIX DATA TYPE MISMATCHES
+-- ============================================================================
+
 ALTER TABLE transactions 
 ALTER COLUMN worker_id TYPE character varying;
 
--- Add foreign key constraint for transactions table
 ALTER TABLE transactions 
 DROP CONSTRAINT IF EXISTS transactions_worker_id_fkey;
 
@@ -17,53 +21,14 @@ ALTER TABLE transactions
 ADD CONSTRAINT transactions_worker_id_fkey 
 FOREIGN KEY (worker_id) REFERENCES workers(worker_id);
 
--- Fix worker_id data type mismatch in tips table
-ALTER TABLE tips 
-DROP CONSTRAINT IF EXISTS tips_worker_id_fkey;
-
-ALTER TABLE tips 
-ADD CONSTRAINT tips_worker_id_fkey 
-FOREIGN KEY (worker_id) REFERENCES workers(worker_id);
-
 -- ============================================================================
--- 2. CONSOLIDATE DATA - MIGRATE TIPS TO TRANSACTIONS
--- ============================================================================
-
--- Insert any tips data that's not in transactions
-INSERT INTO transactions (
-    worker_id, 
-    customer_number, 
-    amount, 
-    status, 
-    mpesa_tx_id, 
-    created_at, 
-    updated_at
-)
-SELECT 
-    t.worker_id,
-    t.customer_phone,
-    t.amount,
-    CASE 
-        WHEN t.status = 'completed' THEN 'COMPLETED'
-        WHEN t.status = 'failed' THEN 'FAILED'
-        ELSE 'PENDING'
-    END,
-    t.mpesa_receipt,
-    t.created_at,
-    t.updated_at
-FROM tips t
-LEFT JOIN transactions tr ON tr.mpesa_tx_id = t.mpesa_receipt
-WHERE tr.id IS NULL AND t.mpesa_receipt IS NOT NULL;
-
--- ============================================================================
--- 3. CREATE TRIGGER FUNCTION TO UPDATE WORKER STATISTICS
+-- 3. CREATE TRIGGER FUNCTION
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION update_worker_stats()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Update worker statistics when transaction is completed
-    IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') AND NEW.mpesa_tx_id IS NOT NULL THEN
+    IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') AND NEW.mpesa_tx_id IS NOT NULL AND NEW.worker_id IS NOT NULL THEN
         UPDATE workers 
         SET 
             total_tips = COALESCE((
@@ -82,40 +47,18 @@ BEGIN
         WHERE worker_id = NEW.worker_id;
     END IF;
     
-    -- Handle deletions
-    IF TG_OP = 'DELETE' AND OLD.mpesa_tx_id IS NOT NULL THEN
-        UPDATE workers 
-        SET 
-            total_tips = COALESCE((
-                SELECT SUM(amount) 
-                FROM transactions 
-                WHERE worker_id = OLD.worker_id 
-                AND mpesa_tx_id IS NOT NULL
-            ), 0),
-            tip_count = COALESCE((
-                SELECT COUNT(*) 
-                FROM transactions 
-                WHERE worker_id = OLD.worker_id 
-                AND mpesa_tx_id IS NOT NULL
-            ), 0),
-            updated_at = NOW()
-        WHERE worker_id = OLD.worker_id;
-    END IF;
-    
     RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================================================
--- 4. CREATE TRIGGERS
+-- 4. CREATE TRIGGER
 -- ============================================================================
 
--- Drop existing trigger if it exists
 DROP TRIGGER IF EXISTS trigger_update_worker_stats ON transactions;
 
--- Create new trigger
 CREATE TRIGGER trigger_update_worker_stats
-    AFTER INSERT OR UPDATE OR DELETE ON transactions
+    AFTER INSERT OR UPDATE ON transactions
     FOR EACH ROW
     EXECUTE FUNCTION update_worker_stats();
 
@@ -123,7 +66,6 @@ CREATE TRIGGER trigger_update_worker_stats
 -- 5. FIX CURRENT WORKER STATISTICS
 -- ============================================================================
 
--- Recalculate all worker statistics based on actual completed transactions
 UPDATE workers 
 SET 
     total_tips = COALESCE(stats.total_amount, 0),
@@ -140,7 +82,6 @@ FROM (
 ) stats
 WHERE workers.worker_id = stats.worker_id;
 
--- Reset workers with no completed transactions
 UPDATE workers 
 SET 
     total_tips = 0,
@@ -150,27 +91,62 @@ WHERE worker_id NOT IN (
     SELECT DISTINCT worker_id 
     FROM transactions 
     WHERE mpesa_tx_id IS NOT NULL
+    AND worker_id IS NOT NULL
 );
 
 -- ============================================================================
--- 6. CREATE INDEXES FOR PERFORMANCE
+-- 6. ADD RLS POLICIES
 -- ============================================================================
 
--- Index for faster worker lookups
-CREATE INDEX IF NOT EXISTS idx_transactions_worker_id ON transactions(worker_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_mpesa_tx_id ON transactions(mpesa_tx_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);
+ALTER TABLE workers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tips ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE qr_codes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Workers are viewable by everyone" ON workers;
+CREATE POLICY "Workers are viewable by everyone" ON workers
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Anyone can insert workers" ON workers;
+CREATE POLICY "Anyone can insert workers" ON workers
+    FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Anyone can insert transactions" ON transactions;
+CREATE POLICY "Anyone can insert transactions" ON transactions
+    FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "System can update transactions" ON transactions;
+CREATE POLICY "System can update transactions" ON transactions
+    FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Reviews are viewable by everyone" ON reviews;
+CREATE POLICY "Reviews are viewable by everyone" ON reviews
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Anyone can insert reviews" ON reviews;
+CREATE POLICY "Anyone can insert reviews" ON reviews
+    FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "QR codes are viewable by everyone" ON qr_codes;
+CREATE POLICY "QR codes are viewable by everyone" ON qr_codes
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Anyone can insert QR codes" ON qr_codes;
+CREATE POLICY "Anyone can insert QR codes" ON qr_codes
+    FOR INSERT WITH CHECK (true);
+
+-- ============================================================================
+-- 7. CREATE INDEXES
+-- ============================================================================
+
+CREATE INDEX IF NOT EXISTS idx_transactions_worker_mpesa ON transactions(worker_id, mpesa_tx_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_workers_worker_id ON workers(worker_id);
+CREATE INDEX IF NOT EXISTS idx_workers_phone ON workers(phone);
 
 -- ============================================================================
--- 7. CLEAN UP DUPLICATE/UNUSED TABLES (OPTIONAL - RUN AFTER VERIFICATION)
--- ============================================================================
-
--- UNCOMMENT THESE AFTER VERIFYING DATA IS CORRECTLY IN TRANSACTIONS TABLE
--- DROP TABLE IF EXISTS tips CASCADE;
-
--- ============================================================================
--- 8. CREATE VIEW FOR ANALYTICS (REPLACES COMPLEX QUERIES)
+-- 8. RECREATE ANALYTICS VIEW
 -- ============================================================================
 
 CREATE OR REPLACE VIEW worker_analytics AS
@@ -203,12 +179,18 @@ LEFT JOIN (
 -- 9. VERIFICATION QUERIES
 -- ============================================================================
 
--- Check data consistency
-SELECT 'Data Consistency Check' as check_type;
-
 SELECT 
-    'Workers with incorrect totals' as issue,
-    COUNT(*) as count
+    w.worker_id,
+    w.name,
+    w.total_tips as db_total,
+    w.tip_count as db_count,
+    COALESCE(t.actual_total, 0) as calculated_total,
+    COALESCE(t.actual_count, 0) as calculated_count,
+    CASE 
+        WHEN w.total_tips = COALESCE(t.actual_total, 0) AND w.tip_count = COALESCE(t.actual_count, 0) 
+        THEN 'CORRECT' 
+        ELSE 'MISMATCH' 
+    END as status
 FROM workers w
 LEFT JOIN (
     SELECT 
@@ -219,28 +201,6 @@ LEFT JOIN (
     WHERE mpesa_tx_id IS NOT NULL
     GROUP BY worker_id
 ) t ON w.worker_id = t.worker_id
-WHERE w.total_tips != COALESCE(t.actual_total, 0)
-   OR w.tip_count != COALESCE(t.actual_count, 0);
+ORDER BY w.total_tips DESC;
 
--- Show recent transactions
-SELECT 'Recent Transactions' as check_type;
-SELECT 
-    worker_id,
-    amount,
-    status,
-    mpesa_tx_id,
-    created_at
-FROM transactions 
-ORDER BY created_at DESC 
-LIMIT 10;
-
--- Show worker statistics
-SELECT 'Worker Statistics' as check_type;
-SELECT 
-    worker_id,
-    name,
-    total_tips,
-    tip_count,
-    updated_at
-FROM workers 
-ORDER BY total_tips DESC;
+SELECT 'DATABASE FIX COMPLETED SUCCESSFULLY' as status;

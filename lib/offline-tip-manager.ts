@@ -52,10 +52,7 @@ class OfflineTipManager {
     
     await AsyncStorage.setItem('pendingTips', JSON.stringify(updated));
     
-    // Try immediate sync if online
-    if (this.isOnline) {
-      this.syncPendingTips();
-    }
+    console.log('✅ Tip queued offline, will sync when online');
     
     return offlineTip.id;
   }
@@ -74,12 +71,21 @@ class OfflineTipManager {
     
     this.syncInProgress = true;
     const pending = await this.getPendingTips();
+    const queuedTips = pending.filter(t => t.status === 'queued');
     
-    for (const tip of pending.filter(t => t.status === 'queued')) {
+    if (queuedTips.length > 0) {
+      // Show notification that payments are being processed
+      const { Alert } = await import('react-native');
+      Alert.alert('📶 Back Online!', `Processing ${queuedTips.length} queued tip${queuedTips.length > 1 ? 's' : ''}...`, [
+        { text: 'OK' }
+      ]);
+    }
+    
+    for (const tip of queuedTips) {
       try {
         await this.updateTipStatus(tip.id, 'syncing');
         
-        const response = await fetch('https://ttip-app.onrender.com/api/pay', {
+        const response = await fetch('https://ttip-app.onrender.com/api/stk-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -91,8 +97,12 @@ class OfflineTipManager {
 
         const result = await response.json();
         
-        if (result.ResponseCode === '0') {
+        if (result.success) {
           await this.removeTip(tip.id);
+          // Show STK push notification
+          Alert.alert('💰 Payment Initiated', `STK push sent for KSh ${tip.amount}! Check your phone.`, [
+            { text: 'OK' }
+          ]);
         } else {
           await this.updateTipStatus(tip.id, 'failed');
         }
