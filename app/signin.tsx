@@ -215,7 +215,7 @@ function SignInScreen() {
         <MaterialIcons name="arrow-back" size={28} color={colors.text} />
       </TouchableOpacity>
       <View style={styles.logoContainer}>
-        <Image source={require('../assets/images/mylogo.png')} style={styles.logo} />
+        <Image source={{ uri: 'https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png' }} style={styles.logo} />
       </View>
       <View style={styles.fixedTopSection}>
         <Text style={styles.label}>ENTER PHONE NUMBER:</Text>
@@ -329,7 +329,7 @@ function SignInScreen() {
       {step === 'phone' ? renderPhoneStep() : renderOTPStep()}
       
       <View style={styles.developerCredit}>
-        <Image source={require('../assets/images/mylogo.png')} style={styles.creditLogo} />
+        <Image source={{ uri: 'https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png' }} style={styles.creditLogo} />
         <Text style={styles.creditText}>Developed by ElitJohns Digital Services</Text>
       </View>
 

@@ -2,13 +2,6 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useState } from 'react';
 import { AppState, Image, Text, View, useColorScheme } from 'react-native';
-const welcomeImages = [
-  require('../assets/images/woman-service.jpg'),
-  require('../assets/images/bartender-working-club.jpg'),
-  require('../assets/images/man-truck.jpg'),
-  require('../assets/images/harvest.jpg'),
-  require('../assets/images/woman-service.jpg'),
-];
 
 
 import { ThemeProvider } from '../lib/theme-context';
@@ -33,13 +26,8 @@ export default function RootLayout() {
     const initApp = async () => {
       try {
         await SplashScreen.preventAutoHideAsync();
-        setTimeout(async () => {
-          try {
-            await SplashScreen.hideAsync();
-          } catch (error) {
-            // Ignore splash screen errors
-          }
-        }, 100);
+        
+        // Don't hide splash screen here - let welcome screen control it
       } catch (error) {
         // Ignore if splash screen is not available
       }

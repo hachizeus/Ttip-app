@@ -147,7 +147,7 @@ export default function TipScreen() {
       </TouchableOpacity>
       
       <View style={styles.header}>
-        <Image source={require('../../assets/images/mylogo.png')} style={styles.logo} />
+        <Image source={{ uri: 'https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png' }} style={styles.logo} />
         <Text style={styles.title}>💰 Tip {worker.name}</Text>
         <Text style={styles.subtitle}>{worker.occupation}</Text>
         <View style={styles.workerCard}>
@@ -209,7 +209,7 @@ export default function TipScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Image source={require('../../assets/images/mylogo.png')} style={styles.footerLogo} />
+        <Image source={{ uri: 'https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png' }} style={styles.footerLogo} />
         <Text style={styles.footerText}>Powered by TTip</Text>
       </View>
     </ScrollView>

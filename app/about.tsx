@@ -19,7 +19,7 @@ export default function AboutScreen() {
 
       <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.logoSection}>
-          <Image source={require('../assets/images/mylogo.png')} style={styles.appLogo} />
+          <Image source={{ uri: 'https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png' }} style={styles.appLogo} />
           <Text style={[styles.appName, { color: colors.text }]}>TTip</Text>
           <Text style={[styles.tagline, { color: colors.textSecondary }]}>Digital Tipping Made Easy</Text>
           <Text style={[styles.version, { color: colors.textSecondary }]}>Version 1.0.0</Text>
@@ -66,7 +66,7 @@ export default function AboutScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Developed by</Text>
           <View style={styles.developerSection}>
-            <Image source={require('../assets/images/mylogo.png')} style={styles.developerLogo} />
+            <Image source={{ uri: 'https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png' }} style={styles.developerLogo} />
             <Text style={[styles.text, { color: colors.text }]}>ElitJohns Digital Services</Text>
           </View>
           <Text style={[styles.copyrightText, { color: colors.textSecondary }]}>Nairobi, Kenya{'\n'}© 2024 All rights reserved</Text>

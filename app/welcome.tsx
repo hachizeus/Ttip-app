@@ -1,119 +1,139 @@
 import { MaterialIcons } from '@expo/vector-icons'
+import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import React, { useEffect, useRef, useState } from 'react'
-import { Dimensions, Image, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Dimensions, StatusBar, StyleSheet, Text, TouchableOpacity, View, Animated, PanResponder } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { BannerImage, fetchBannerImages } from '../services/bannerService'
 
 const { width, height } = Dimensions.get('screen')
 
-const images = [
-  require('../assets/images/woman-service.jpg'),
-  require('../assets/images/bartender-working-club.jpg'),
-  require('../assets/images/man-truck.jpg'),
-  require('../assets/images/harvest.jpg'),
-  require('../assets/images/woman-service.jpg'), // Duplicate for seamless loop
-]
-
 function WelcomeContent() {
-  const scrollRef = useRef<ScrollView>(null)
+  const scrollX = useRef(new Animated.Value(0)).current
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [images, setImages] = useState<BannerImage[]>([])
   const [imagesLoaded, setImagesLoaded] = useState(false)
+  const [autoScrollStopped, setAutoScrollStopped] = useState(false)
+  const [autoScrollCompleted, setAutoScrollCompleted] = useState(false)
+
   const insets = useSafeAreaInsets()
 
   useEffect(() => {
-    const cacheImages = async () => {
-      try {
-        // Check if images are already cached
-        const cached = await AsyncStorage.getItem('welcomeImagesCached')
-        if (cached === 'true') {
-          setImagesLoaded(true)
-          return
-        }
-        
-        // Preload and cache all images
-        const prefetchPromises = images.map(image => 
-          Image.prefetch(Image.resolveAssetSource(image).uri)
-        )
-        
-        await Promise.all(prefetchPromises)
-        await AsyncStorage.setItem('welcomeImagesCached', 'true')
-        setImagesLoaded(true)
-      } catch (error) {
-        // Fallback: just load first image
-        Image.prefetch(Image.resolveAssetSource(images[0]).uri).then(() => {
-          setImagesLoaded(true)
-        })
-      }
+    const loadBanners = async () => {
+      const banners = await fetchBannerImages()
+      console.log('Loaded banners:', banners)
+      setImages(banners) // Use original banners without duplication
+      setImagesLoaded(true)
     }
-    
-    cacheImages()
+    loadBanners()
   }, [])
-
-  // Removed image preloading effect
 
   useEffect(() => {
-    // Delay auto-scroll to allow images to load
-    const timeout = setTimeout(() => {
-      const interval = setInterval(() => {
-        setCurrentIndex(prev => {
-          const nextIndex = prev + 1
-          if (nextIndex >= images.length - 1) {
-            scrollRef.current?.scrollTo({ x: nextIndex * width, animated: true })
-            setTimeout(() => {
-              scrollRef.current?.scrollTo({ x: 0, animated: false })
-            }, 500)
-            return 0
-          } else {
-            scrollRef.current?.scrollTo({ x: nextIndex * width, animated: true })
-            return nextIndex
-          }
-        })
-      }, 5000) // Reduced from 7000 to 5000
-      return () => clearInterval(interval)
-    }, 2000) // Wait 2 seconds before starting auto-scroll
+    if (!imagesLoaded || images.length === 0 || autoScrollCompleted) return
     
-    return () => clearTimeout(timeout)
-  }, [])
+    const interval = setInterval(() => {
+      setCurrentIndex(prev => {
+        const nextIndex = prev + 1
+        if (nextIndex >= images.length) {
+          Animated.timing(scrollX, {
+            toValue: -(images.length - 1) * width,
+            duration: 300,
+            useNativeDriver: true
+          }).start()
+          setAutoScrollStopped(true)
+          setAutoScrollCompleted(true)
+          return images.length - 1
+        } else {
+          Animated.timing(scrollX, {
+            toValue: -nextIndex * width,
+            duration: 300,
+            useNativeDriver: true
+          }).start()
+          return nextIndex
+        }
+      })
+    }, 3000)
 
-  // Removed loading placeholder
+    return () => clearInterval(interval)
+  }, [imagesLoaded, images.length, autoScrollCompleted])
+
+  const panResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gestureState) => {
+      return Math.abs(gestureState.dx) > 10
+    },
+    onPanResponderMove: (_, gestureState) => {
+      const newValue = -currentIndex * width + gestureState.dx
+      const maxValue = 0
+      const minValue = -(images.length - 1) * width
+      
+      if (newValue <= maxValue && newValue >= minValue) {
+        scrollX.setValue(newValue)
+      }
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      const threshold = width * 0.3
+      let targetIndex = currentIndex
+      
+      if (gestureState.dx > threshold && currentIndex > 0) {
+        targetIndex = currentIndex - 1
+      } else if (gestureState.dx < -threshold && currentIndex < images.length - 1) {
+        targetIndex = currentIndex + 1
+      }
+      
+      Animated.timing(scrollX, {
+        toValue: -targetIndex * width,
+        duration: 300,
+        useNativeDriver: true
+      }).start()
+      
+      setCurrentIndex(targetIndex)
+    }
+  })
 
   return (
     <View style={styles.container}>
       <StatusBar hidden={true} />
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        style={styles.carousel}
-        contentContainerStyle={{ flexGrow: 1 }}
-        decelerationRate="fast"
-        snapToInterval={width}
-        snapToAlignment="start"
-        scrollEventThrottle={16}
-      >
-        {images.map((image, index) => (
-          <View key={index} style={{ width: width, height: height, backgroundColor: '#667eea' }}>
-            <Image
-              source={image}
-              style={styles.carouselImage}
-              resizeMode="cover"
-              defaultSource={require('../assets/images/mylogo.png')}
-              cache="force-cache"
+      <View style={styles.carousel} {...panResponder.panHandlers}>
+        <Animated.View 
+          style={[
+            styles.carouselContainer,
+            {
+              transform: [{ translateX: scrollX }],
+              width: width * images.length
+            }
+          ]}
+        >
+          {images.length > 0 ? images.map((banner, index) => (
+            <Image 
+              key={`${banner.id}-${index}`}
+              source={{ uri: banner.url }}
+              style={styles.carouselImage} 
+              contentFit="cover"
+              transition={200}
+              cachePolicy="memory-disk"
             />
-          </View>
-        ))}
-      </ScrollView>
-      <View style={styles.overlay}>
+          )) : (
+            <View style={[{ width: width, height: height }, styles.imagePlaceholder]} />
+          )}
+        </Animated.View>
+      </View>
+      
+      <View style={styles.overlay} pointerEvents="box-none">
         <View style={styles.topSection}>
-          <Image source={require('../assets/images/mylogo.png')} style={styles.logo} />
+          <Image 
+            source={{ uri: 'https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png' }}
+            style={styles.logo}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+          />
         </View>
-        <View style={styles.bottomSection}>
+        
+        <View style={styles.bottomSection} pointerEvents="box-none">
           <Text style={styles.tagline}>RECEIVE TIPS INSTANTLY</Text>
           <Text style={styles.subtitle}>DIGITALLY WITH SECURE MOBILE PAYMENTS</Text>
+          
           <View style={styles.dotsContainer}>
-            {images.slice(0, -1).map((_, index) => (
+            {images.map((_, index) => (
               <View 
                 key={index} 
                 style={[
@@ -123,19 +143,31 @@ function WelcomeContent() {
               />
             ))}
           </View>
-          <TouchableOpacity
-            style={styles.signInButton}
-            onPress={() => router.push('/signup')}
-          >
-            <Text style={styles.signInText}>SIGN UP</Text>
-            <MaterialIcons name="arrow-forward" size={20} color="#fff" style={styles.arrow} />
-          </TouchableOpacity>
-          <Text style={styles.signUpText}>
-            ALREADY HAVE AN ACCOUNT? 
-            <Text style={styles.signUpLink} onPress={() => router.push('/signin')}>SIGN IN</Text>
-          </Text>
+          
+          <View pointerEvents="auto">
+            <TouchableOpacity
+              style={styles.signInButton}
+              onPress={() => router.push('/signup')}
+            >
+              <Text style={styles.signInText}>SIGN UP</Text>
+              <MaterialIcons name="arrow-forward" size={20} color="#fff" style={styles.arrow} />
+            </TouchableOpacity>
+          </View>
+          
+          <View pointerEvents="auto">
+            <Text style={styles.signUpText}>
+              ALREADY HAVE AN ACCOUNT? 
+              <Text style={styles.signUpLink} onPress={() => router.push('/signin')}>SIGN IN</Text>
+            </Text>
+          </View>
+          
           <View style={styles.developerCredit}>
-            <Image source={require('../assets/images/mylogo.png')} style={styles.creditLogo} />
+            <Image 
+              source={{ uri: 'https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png' }}
+              style={styles.creditLogo}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+            />
             <Text style={styles.creditText}>Developed by ElitJohns Digital Services</Text>
           </View>
         </View>
@@ -158,6 +190,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    margin: 0,
+    padding: 0,
+    overflow: 'hidden',
+  },
+  carouselContainer: {
+    flexDirection: 'row',
+    height: height,
   },
   carouselImage: {
     width: width,

@@ -4,11 +4,11 @@
     "slug": "ttip-digital-tipping",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/mylogo.png",
+    "icon": "https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/mylogo.png",
+      "image": "https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png",
       "resizeMode": "contain"
     },
     "ios": {
@@ -22,7 +22,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/mylogo.png"
+        "foregroundImage": "https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png"
       },
       "package": "com.ttip.app",
       "versionCode": 1,
@@ -37,7 +37,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/mylogo.png"
+      "favicon": "https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png"
     },
     "plugins": [
       "expo-router",

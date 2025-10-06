@@ -109,7 +109,7 @@ export default function QRCodeScreen() {
                     size={220}
                     backgroundColor={colors.card}
                     color={colors.text}
-                    logo={require('../assets/images/mylogo.png')}
+                    logo={{ uri: 'https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png' }}
                     logoSize={50}
                     logoBackgroundColor={colors.card}
                     logoMargin={4}

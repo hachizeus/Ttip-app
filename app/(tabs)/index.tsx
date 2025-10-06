@@ -375,7 +375,7 @@ export default function HomeScreen() {
                 size={200}
                 backgroundColor="white"
                 color="black"
-                logo={require('../../assets/images/mylogo.png')}
+                logo={{ uri: 'https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png' }}
                 logoSize={40}
                 logoBackgroundColor="transparent"
                 logoMargin={2}

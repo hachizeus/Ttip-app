@@ -84,7 +84,7 @@ function SignupContent() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <MaterialIcons name="arrow-back" size={28} color={colors.text} />
         </TouchableOpacity>
-        <Image source={require('../assets/images/mylogo.png')} style={styles.logo} />
+        <Image source={{ uri: 'https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png' }} style={styles.logo} />
         <View style={styles.placeholder} />
       </View>
       <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -146,7 +146,7 @@ function SignupContent() {
           </TouchableOpacity>
         </View>
         <View style={styles.developerCredit}>
-          <Image source={require('../assets/images/mylogo.png')} style={styles.creditLogo} />
+          <Image source={{ uri: 'https://cpbonffjhrckiiqbsopt.supabase.co/storage/v1/object/public/banners/mylogo.png' }} style={styles.creditLogo} />
           <Text style={[styles.creditText, { color: colors.textSecondary }]}>Developed by ElitJohns Digital Services</Text>
         </View>
       </ScrollView>

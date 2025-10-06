@@ -175,7 +175,12 @@ export default function OfflineTipModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal 
+      visible={visible} 
+      animationType="slide" 
+      transparent
+      presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'overFullScreen'}
+    >
       <TouchableOpacity 
         style={styles.overlay} 
         activeOpacity={1} 
@@ -246,15 +251,21 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: Platform.OS === 'android' ? 'center' : 'flex-end',
+    alignItems: Platform.OS === 'android' ? 'center' : 'stretch',
   },
   modal: {
-    width: '100%',
+    width: Platform.OS === 'android' ? '85%' : '100%',
     paddingTop: 30,
-    paddingBottom: 130,
+    paddingBottom: Platform.OS === 'android' ? 30 : 130,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    ...(Platform.OS === 'android' && {
+      borderRadius: 20,
+      borderBottomLeftRadius: 20,
+      borderBottomRightRadius: 20,
+    }),
   },
   header: {
     flexDirection: 'row',
