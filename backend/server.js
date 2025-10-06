@@ -222,6 +222,146 @@ const csrfProtection = (req, res, next) => {
     next();
 };
 
+// ===== OTP AUTHENTICATION ENDPOINTS =====
+
+// Simple OTP storage (in production, use Redis)
+const otpStore = new Map();
+
+// Generate 4-digit OTP
+const generateOTP = () => {
+    return Math.floor(1000 + Math.random() * 9000).toString();
+};
+
+// Send OTP endpoint
+app.post('/api/send-otp', async (req, res) => {
+    const { phone } = req.body;
+    
+    if (!phone) {
+        return res.status(400).json({ success: false, error: 'Phone number required' });
+    }
+    
+    try {
+        // Format phone number
+        let formattedPhone = phone;
+        if (phone.startsWith('0')) {
+            formattedPhone = '254' + phone.substring(1);
+        }
+        
+        // Generate OTP
+        const otp = generateOTP();
+        
+        // Store OTP with 5-minute expiry
+        otpStore.set(formattedPhone, {
+            otp,
+            expires: Date.now() + 5 * 60 * 1000 // 5 minutes
+        });
+        
+        console.log(`OTP for ${formattedPhone}: ${otp}`);
+        
+        // In production, send SMS here
+        // For now, just log it
+        logger.info('OTP generated', {
+            phone: formattedPhone,
+            otp: otp // Remove in production
+        });
+        
+        res.json({ 
+            success: true, 
+            message: 'OTP sent successfully',
+            // For testing only - remove in production
+            otp: process.env.NODE_ENV === 'development' ? otp : undefined
+        });
+        
+    } catch (error) {
+        logger.error('Send OTP error', error);
+        res.status(500).json({ success: false, error: 'Failed to send OTP' });
+    }
+});
+
+// Verify OTP endpoint
+app.post('/api/verify-otp', async (req, res) => {
+    const { phone, otp } = req.body;
+    
+    if (!phone || !otp) {
+        return res.status(400).json({ success: false, error: 'Phone and OTP required' });
+    }
+    
+    try {
+        // Format phone number
+        let formattedPhone = phone;
+        if (phone.startsWith('0')) {
+            formattedPhone = '254' + phone.substring(1);
+        }
+        
+        // Check OTP
+        const storedOTP = otpStore.get(formattedPhone);
+        
+        if (!storedOTP) {
+            return res.json({ success: false, error: 'OTP not found or expired' });
+        }
+        
+        if (Date.now() > storedOTP.expires) {
+            otpStore.delete(formattedPhone);
+            return res.json({ success: false, error: 'OTP expired' });
+        }
+        
+        if (storedOTP.otp !== otp) {
+            return res.json({ success: false, error: 'Invalid OTP' });
+        }
+        
+        // OTP is valid - clean up
+        otpStore.delete(formattedPhone);
+        
+        // Check if worker exists, if not create one
+        let { data: worker } = await supabase
+            .from('workers')
+            .select('*')
+            .eq('phone', formattedPhone)
+            .single();
+        
+        if (!worker) {
+            // Create new worker
+            const workerId = 'W' + Date.now().toString(36).toUpperCase();
+            const { data: newWorker, error } = await supabase
+                .from('workers')
+                .insert({
+                    worker_id: workerId,
+                    phone: formattedPhone,
+                    name: formattedPhone, // Default name
+                    occupation: 'Service Worker'
+                })
+                .select()
+                .single();
+            
+            if (error) {
+                logger.error('Worker creation error', error);
+                return res.status(500).json({ success: false, error: 'Failed to create worker account' });
+            }
+            
+            worker = newWorker;
+        }
+        
+        logger.info('OTP verification successful', {
+            phone: formattedPhone,
+            workerId: worker.worker_id
+        });
+        
+        res.json({ 
+            success: true, 
+            message: 'OTP verified successfully',
+            worker: {
+                id: worker.worker_id,
+                name: worker.name,
+                phone: worker.phone
+            }
+        });
+        
+    } catch (error) {
+        logger.error('Verify OTP error', error);
+        res.status(500).json({ success: false, error: 'Failed to verify OTP' });
+    }
+});
+
 // ===== PHASE 1 ENDPOINTS (Enhanced) =====
 
 // Generate QR Code
@@ -2300,7 +2440,7 @@ app.get('/health', (req, res) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`TTip Phase 3 Server running on port ${PORT}`);
     console.log('Phase 1: Commission System, Referral Program, Review System');
